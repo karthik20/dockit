@@ -1,0 +1,33 @@
+{
+  "name": "@dockit/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mcp": "tsx src/mcp.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@antora/cli": "^3.1.14",
+    "@antora/site-generator": "^3.2.0-alpha.11",
+    "@asciidoctor/cli": "^4.0.0",
+    "@asciidoctor/core": "^2.2.9",
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "node-html-parser": "^6.1.13",
+    "unzipper": "^0.12.3",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/unzipper": "^0.10.10",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,77 @@
+# Dockit - Documentation index for LLM context
+# Define your documentation entries and their sources below.
+# Run `npx tsx apps/server/src/mcp.ts` to start the MCP server.
+
+entries:
+  - id: quarkus
+    name: Quarkus
+    version: "3.35"
+    description: "Quarkus - Supersonic Subatomic Java"
+    sources:
+      - type: asciidoc
+        label: "Quarkus Docs (AsciiDoc)"
+        repoUrl: "https://github.com/quarkusio/quarkus.git"
+        sourcePath: "docs/src/main/asciidoc"
+
+  - id: quarkus-core
+    name: Quarkus Core
+    version: "3.35.2"
+    description: "Quarkus Core API"
+    sources:
+      - type: maven
+        label: "Quarkus Core Javadoc"
+        groupId: "io.quarkus"
+        artifactId: "quarkus-core"
+        version: "3.35.2"
+        classifier: "javadoc"
+
+  # --- Local/Offline mode examples (uncomment to use) ---
+
+  # - id: quarkus-local
+  #   name: Quarkus (Local Clone)
+  #   version: "3.35"
+  #   description: "Quarkus docs from a pre-cloned repo"
+  #   sources:
+  #     - type: asciidoc
+  #       label: "Quarkus Docs (local)"
+  #       localPath: "/home/user/repos/quarkus"
+  #       sourcePath: "docs/src/main/asciidoc"
+
+  # - id: quarkus-mvn
+  #   name: Quarkus Core (Maven CLI)
+  #   version: "3.35.2"
+  #   description: "Quarkus Core via local Maven + settings.xml"
+  #   sources:
+  #     - type: maven
+  #       label: "Quarkus Core Javadoc"
+  #       groupId: "io.quarkus"
+  #       artifactId: "quarkus-core"
+  #       version: "3.35.2"
+  #       useMavenCommand: true
+
+  # - id: spring-boot-local
+  #   name: Spring Boot (Local)
+  #   version: "3.4.x"
+  #   description: "Spring Boot from a pre-cloned repo"
+  #   sources:
+  #     - type: antora
+  #       label: "Spring Boot Reference"
+  #       localPath: "/home/user/repos/spring-boot"
+  #     - type: asciidoc
+  #       label: "Spring Boot Docs"
+  #       localPath: "/home/user/repos/spring-boot"
+  #       sourcePath: "spring-boot-project/spring-boot-docs/src/docs/asciidoc"
+
+  # - id: company-docs
+  #   name: Company Docs
+  #   version: "1.0"
+  #   description: "Internal documentation"
+  #   sources:
+  #     - type: zip
+  #       label: "Docs ZIP"
+  #       localPath: "/home/user/downloads/docs.zip"
+
+mcp:
+  toolPrefix: "dockit_"
+  maxSearchResults: 10
+  autoBuild: false
