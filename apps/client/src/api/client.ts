@@ -47,5 +47,8 @@ export const api = {
   search: (entryId: string, q: string) =>
     request<SearchResult[]>(`/entries/${entryId}/search?q=${encodeURIComponent(q)}`),
 
+  searchGlobal: (q: string) =>
+    request<Array<SearchResult & { entryId: string; entryName: string; entryVersion: string }>>(`/search?q=${encodeURIComponent(q)}`),
+
   bundleUrl: (entryId: string) => `${BASE}/bundle/${entryId}/`,
 };
