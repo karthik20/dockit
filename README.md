@@ -62,21 +62,53 @@ entries:
 
 ## MCP Server
 
-Dockit exposes an MCP (Model Context Protocol) stdio server for AI tools like Claude Desktop and Cline. Configure it to search and fetch documentation on demand.
+Dockit exposes an MCP (Model Context Protocol) server for AI tools like Claude Desktop, Cline, and OpenCode. Configure it to search and fetch documentation on demand.
 
-### Configuration (Claude Desktop)
+### Stdio Transport (Claude Desktop / Cline)
 
 ```json
 // ~/.claude/claude_desktop_config.json
 {
   "mcpServers": {
     "dockit": {
-      "command": "npx",
-      "args": ["tsx", "apps/server/src/mcp.ts"],
-      "cwd": "/path/to/dockit"
+      "command": "bash",
+      "args": ["/path/to/dockit/scripts/mcp-wrapper.sh"]
     }
   }
 }
+```
+
+### OpenCode
+
+```json
+// ~/.config/opencode/opencode.json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "dockit": {
+      "type": "local",
+      "command": ["bash", "/path/to/dockit/scripts/mcp-wrapper.sh"],
+      "enabled": true
+    }
+  }
+}
+```
+
+### HTTP Transport (API / curl)
+
+For HTTP JSON-RPC access, use the bridge wrapper:
+
+```bash
+# Start HTTP bridge on port 3456
+DOCKIT_MCP_HTTP_PORT=3456 ./scripts/mcp-wrapper.sh
+
+# Or directly
+npx tsx apps/server/src/mcp-http.ts 3456
+
+# Then curl:
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
 ### MCP Tools
@@ -84,10 +116,17 @@ Dockit exposes an MCP (Model Context Protocol) stdio server for AI tools like Cl
 | Tool | Description |
 |------|-------------|
 | `dockit_list_entries` | List all configured documentation entries |
-| `dockit_search` | Search built docs by keyword (entry + query) |
+| `dockit_find_entry` | Find entries by name/description (no ID required) |
+| `dockit_search` | Search built docs by keyword within a specific entry |
+| `dockit_global_search` | Search across **all** built entries at once (no ID required) |
 | `dockit_get_doc` | Fetch full plain-text content of a document |
 | `dockit_build` | Build/rebuild documentation for an entry |
 | `dockit_build_status` | Check build status |
+
+**Recommended flow for AI assistants:**
+1. `dockit_global_search` — broad discovery without knowing entry IDs
+2. `dockit_find_entry` — locate an entry by friendly name
+3. `dockit_get_doc` — retrieve full document content after finding a match
 
 See `SKILL.md` for LLM instructions on how to use these tools effectively.
 
@@ -145,7 +184,7 @@ dockit/
 | Frontend | React 19, TypeScript, Vite 6, Tailwind CSS 4, React Router 7 |
 | Backend | Express 4, TypeScript, tsx |
 | Database | SQLite via better-sqlite3 |
-| MCP | @modelcontextprotocol/sdk 1.29 |
+| MCP | @modelcontextprotocol/server 2.0.0-alpha.2 |
 | HTML Parsing | node-html-parser |
 | AsciiDoc | @asciidoctor/core |
 | Archives | unzipper |
