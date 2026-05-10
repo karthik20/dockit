@@ -52,7 +52,7 @@ export default function EntryForm() {
   }
 
   return (
-    <div className="max-w-xl">
+    <div className="p-6 md:p-8 max-w-xl">
       <button
         onClick={() => navigate(-1)}
         className="flex items-center gap-1.5 text-sm text-text-dim hover:text-text mb-6 transition-colors"
@@ -73,7 +73,7 @@ export default function EntryForm() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Quarkus"
-            className="w-full px-3.5 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            className="w-full px-3.5 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
         </div>
         <div>
@@ -83,7 +83,7 @@ export default function EntryForm() {
             value={version}
             onChange={(e) => setVersion(e.target.value)}
             placeholder="e.g. 3.8.0"
-            className="w-full px-3.5 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            className="w-full px-3.5 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
         </div>
         <div>
@@ -93,7 +93,7 @@ export default function EntryForm() {
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief description of this documentation entry"
             rows={3}
-            className="w-full px-3.5 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
+            className="w-full px-3.5 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all resize-none"
           />
         </div>
 

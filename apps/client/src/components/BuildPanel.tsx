@@ -42,19 +42,19 @@ export default function BuildPanel({ entryId, refreshKey }: Props) {
                       status.status === 'error' ? 'bg-danger' : 'bg-warning';
 
   return (
-    <div className="bg-surface ring-1 ring-border rounded-xl overflow-hidden">
+    <div className="bg-surface ring-1 ring-border rounded-lg overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-bg-alt transition-colors text-left"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bg-alt transition-colors text-left"
       >
-        {open ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
-        <Terminal size={16} className="text-text-dim" />
-        <span className="text-sm font-medium text-text">Build Log</span>
-        <span className="flex items-center gap-1.5 ml-auto">
-          {status.status === 'building' && <Loader2 size={14} className="animate-spin text-warning" />}
-          {status.status === 'ready' && <CheckCircle size={14} className="text-success" />}
-          {status.status === 'error' && <AlertCircle size={14} className="text-danger" />}
-          <span className={`text-xs font-medium ${
+        {open ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+        <Terminal size={14} className="text-text-dim" />
+        <span className="text-xs font-medium text-text">Build Log</span>
+        <span className="flex items-center gap-1 ml-auto">
+          {status.status === 'building' && <Loader2 size={12} className="animate-spin text-warning" />}
+          {status.status === 'ready' && <CheckCircle size={12} className="text-success" />}
+          {status.status === 'error' && <AlertCircle size={12} className="text-danger" />}
+          <span className={`text-[11px] font-medium ${
             status.status === 'ready' ? 'text-success' :
             status.status === 'error' ? 'text-danger' :
             'text-warning'
@@ -65,8 +65,8 @@ export default function BuildPanel({ entryId, refreshKey }: Props) {
       </button>
       {open && (
         <div className="relative">
-          <div className={`absolute left-0 top-0 bottom-0 w-1 ${accentColor}`} />
-          <div className="bg-terminal-bg text-terminal-fg p-4 pl-5 max-h-72 overflow-auto font-mono text-xs leading-relaxed">
+          <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${accentColor}`} />
+          <div className="bg-terminal-bg text-terminal-fg p-3 pl-4 max-h-48 overflow-auto font-mono text-[11px] leading-relaxed">
             <pre className="whitespace-pre-wrap">{status.log || 'Waiting for build to start...'}</pre>
             <div ref={logEndRef} />
           </div>
