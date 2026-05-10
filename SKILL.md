@@ -17,8 +17,16 @@ Lists all documentation entries that have been configured. Use this first to dis
 Input: none
 Output: Array of `{ id, name, version, description, status, sourceCount }`
 
+### `dockit_find_entry`
+Finds entries by name or description without needing the entry ID. Useful when the user mentions a framework by name.
+
+Input:
+- `query` (required): Substring to match against entry name or description
+
+Output: Array of matching `{ id, name, version, description, status }`
+
 ### `dockit_search`
-Searches the built documentation for an entry. Returns matching document paths, titles, and text snippets.
+Searches the built documentation for a **specific** entry. Returns matching document paths, titles, and text snippets.
 
 Input:
 - `entry` (required): Entry ID to search
@@ -27,12 +35,21 @@ Input:
 
 Output: Array of `{ path, title, headings, snippet }`
 
+### `dockit_global_search`
+Searches across **all** built documentation entries at once. No entry ID required. This is the preferred starting point for most user questions.
+
+Input:
+- `query` (required): Search query string
+- `maxResults` (optional): Max total results 1-50, default 20
+
+Output: Array of `{ entryId, entryName, entryVersion, path, title, headings, snippet }`
+
 ### `dockit_get_doc`
 Retrieves the full text content of a specific documentation file as plain text (stripped HTML, markdown-style headings preserved).
 
 Input:
 - `entry` (required): Entry ID
-- `path` (required): Document path from `dockit_search` results (e.g. `asciidoc/rest-json.html`)
+- `path` (required): Document path from search results (e.g. `asciidoc/rest-json.html`)
 
 Output: Full document text (max 50KB, truncated at paragraph boundary if longer)
 
@@ -54,13 +71,20 @@ Output: `{ status, startedAt, finishedAt, log }`
 
 ## Workflow
 
-### Best Practice: Query → Search → Fetch
+### Best Practice for General Questions (Recommended)
 
-1. **List entries**: If unsure what docs are available, call `dockit_list_entries` first
-2. **Search**: Use `dockit_search` with relevant keywords for the user's question
-3. **Select relevant docs**: Review snippets and pick 2-5 most relevant results
-4. **Fetch full content**: Call `dockit_get_doc` for each selected document
-5. **Answer**: Use the document text as authoritative context to answer the user's question
+1. **Global search**: Start with `dockit_global_search` using the user's question keywords. No entry ID needed.
+2. **Select relevant docs**: Review snippets and pick 2-5 most relevant results
+3. **Fetch full content**: Call `dockit_get_doc` for each selected document (using `entryId` from global results)
+4. **Answer**: Use the document text as authoritative context to answer the user's question
+
+### Alternative: Entry-Specific Search
+
+If you already know the entry ID or need to search within a specific framework:
+
+1. **Find entry** (optional): Call `dockit_find_entry` with the framework name to get the ID
+2. **Search**: Use `dockit_search` with the entry ID and relevant keywords
+3. **Fetch + answer**: Same as above
 
 ### Status Checking
 

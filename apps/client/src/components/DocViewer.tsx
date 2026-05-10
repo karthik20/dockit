@@ -16,57 +16,61 @@ export default function DocViewer({ entryId, selectedFile }: Props) {
 
   useEffect(() => { setError(false); }, [selectedFile]);
 
-  return (
-    <div className={`${expanded ? 'fixed inset-0 z-40 bg-white' : ''}`}>
-      <div className={`flex items-center justify-between ${expanded ? 'h-12 px-4 border-b border-gray-200' : 'mb-3'}`}>
-        <h3 className="text-sm font-semibold text-gray-700">
-          Documentation Viewer
-          {selectedFile && (
-            <span className="ml-2 text-xs font-normal text-gray-400 font-mono truncate inline-block max-w-[200px] align-bottom">
-              {selectedFile}
-            </span>
-          )}
-        </h3>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            title={expanded ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-          </button>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            title="Open in new tab"
-          >
-            <ExternalLink size={15} />
-          </a>
+  if (!selectedFile) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-bg-alt flex items-center justify-center">
+          <FileText size={26} className="text-text-muted" />
+        </div>
+        <div>
+          <p className="text-sm text-text-dim font-medium">No document selected</p>
+          <p className="text-xs text-text-muted mt-1">Search for a document and click a result to view it here.</p>
         </div>
       </div>
+    );
+  }
 
-      {!selectedFile ? (
-        <div className={`flex flex-col items-center justify-center gap-2 text-center ${expanded ? 'h-[calc(100%-3rem)]' : 'h-64'} bg-gray-50 rounded-lg border border-gray-200`}>
-          <FileText size={32} className="text-gray-300" />
-          <p className="text-sm text-gray-500">Select a document from search results</p>
-          <p className="text-xs text-gray-400">Use the search bar above to find and view documentation.</p>
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-bg-alt flex items-center justify-center">
+          <FileWarning size={26} className="text-text-muted" />
         </div>
-      ) : error ? (
-        <div className={`flex flex-col items-center justify-center gap-2 text-center ${expanded ? 'h-[calc(100%-3rem)]' : 'h-64'} bg-gray-50 rounded-lg border border-gray-200`}>
-          <FileWarning size={32} className="text-gray-300" />
-          <p className="text-sm text-gray-500">Documentation not built yet.</p>
-          <p className="text-xs text-gray-400">Click &ldquo;Build Now&rdquo; to generate the documentation.</p>
+        <div>
+          <p className="text-sm text-text-dim font-medium">Could not load document</p>
+          <p className="text-xs text-text-muted mt-1">The documentation may not be built yet. Click &ldquo;Build&rdquo; to generate it.</p>
         </div>
-      ) : (
-        <iframe
-          src={url}
-          onError={() => setError(true)}
-          className={`w-full border border-gray-200 rounded-lg bg-white ${expanded ? 'h-[calc(100%-3rem)]' : 'h-[70vh]'}`}
-          title="Documentation Viewer"
-        />
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-col h-full ${expanded ? 'fixed inset-0 z-40 bg-bg p-4' : ''}`}>
+      <div className="flex items-center gap-2 mb-2 shrink-0">
+        <span className="text-xs text-text-muted font-mono truncate flex-1">{selectedFile}</span>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="p-1 rounded text-text-muted hover:text-text hover:bg-bg-alt transition-colors"
+          title={expanded ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-1 rounded text-text-muted hover:text-text hover:bg-bg-alt transition-colors"
+          title="Open in new tab"
+        >
+          <ExternalLink size={14} />
+        </a>
+      </div>
+      <iframe
+        src={url}
+        onError={() => setError(true)}
+        className="flex-1 w-full ring-1 ring-border rounded-lg bg-surface min-h-0"
+        title="Documentation Viewer"
+      />
     </div>
   );
 }

@@ -38,32 +38,38 @@ export default function BuildPanel({ entryId, refreshKey }: Props) {
 
   if (!status || status.status === 'none') return null;
 
+  const accentColor = status.status === 'ready' ? 'bg-success' :
+                      status.status === 'error' ? 'bg-danger' : 'bg-warning';
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="bg-surface ring-1 ring-border rounded-lg overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bg-alt transition-colors text-left"
       >
-        {open ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
-        <Terminal size={16} className="text-gray-500" />
-        <span className="text-sm font-medium text-gray-700">Build Log</span>
+        {open ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+        <Terminal size={14} className="text-text-dim" />
+        <span className="text-xs font-medium text-text">Build Log</span>
         <span className="flex items-center gap-1 ml-auto">
-          {status.status === 'building' && <Loader2 size={14} className="animate-spin text-blue-500" />}
-          {status.status === 'ready' && <CheckCircle size={14} className="text-green-500" />}
-          {status.status === 'error' && <AlertCircle size={14} className="text-red-500" />}
-          <span className={`text-xs font-medium ${
-            status.status === 'ready' ? 'text-green-600' :
-            status.status === 'error' ? 'text-red-600' :
-            'text-blue-600'
+          {status.status === 'building' && <Loader2 size={12} className="animate-spin text-warning" />}
+          {status.status === 'ready' && <CheckCircle size={12} className="text-success" />}
+          {status.status === 'error' && <AlertCircle size={12} className="text-danger" />}
+          <span className={`text-[11px] font-medium ${
+            status.status === 'ready' ? 'text-success' :
+            status.status === 'error' ? 'text-danger' :
+            'text-warning'
           }`}>
             {status.status.charAt(0).toUpperCase() + status.status.slice(1)}
           </span>
         </span>
       </button>
       {open && (
-        <div className="bg-gray-900 text-green-400 p-4 max-h-64 overflow-auto font-mono text-xs leading-relaxed">
-          <pre className="whitespace-pre-wrap">{status.log || 'Waiting for build to start...'}</pre>
-          <div ref={logEndRef} />
+        <div className="relative">
+          <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${accentColor}`} />
+          <div className="bg-terminal-bg text-terminal-fg p-3 pl-4 max-h-48 overflow-auto font-mono text-[11px] leading-relaxed">
+            <pre className="whitespace-pre-wrap">{status.log || 'Waiting for build to start...'}</pre>
+            <div ref={logEndRef} />
+          </div>
         </div>
       )}
     </div>

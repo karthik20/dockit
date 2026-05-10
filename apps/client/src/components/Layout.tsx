@@ -1,44 +1,53 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home } from 'lucide-react';
+import { BookOpen, Sun, Moon, Plus } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        <div className="h-14 flex items-center px-4 border-b border-gray-100">
-          <Link to="/" className="flex items-center gap-2.5 text-gray-900 no-underline">
-            <BookOpen size={20} className="text-primary" />
-            <span className="font-semibold text-base tracking-tight">Dockit</span>
-          </Link>
-        </div>
-        <nav className="flex-1 p-3 space-y-1">
+    <div className="flex flex-col h-screen overflow-hidden">
+      <header className="h-12 bg-bg-alt border-b border-border flex items-center px-4 gap-4 shrink-0">
+        <Link to="/" className="flex items-center gap-2 no-underline shrink-0">
+          <BookOpen size={18} className="text-primary" />
+          <span className="font-semibold text-sm tracking-tight text-text">Dockit</span>
+        </Link>
+
+        <nav className="flex items-center gap-1">
           <Link
             to="/"
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               location.pathname === '/'
-                ? 'bg-primary-light text-primary'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                ? 'bg-primary/10 text-primary'
+                : 'text-text-dim hover:text-text'
             }`}
           >
-            <Home size={16} />
             Entries
           </Link>
         </nav>
-        <div className="p-3 border-t border-gray-100">
-          <Link
-            to="/entries/new"
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-md text-sm font-medium bg-primary text-white hover:bg-primary-hover transition-colors"
-          >
-            + New Entry
-          </Link>
-        </div>
-      </aside>
+
+        <div className="flex-1" />
+
+        <Link
+          to="/entries/new"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-white hover:bg-primary-hover transition-colors"
+        >
+          <Plus size={14} />
+          New
+        </Link>
+
+        <button
+          onClick={toggleTheme}
+          className="p-1.5 rounded-md text-text-dim hover:text-text hover:bg-surface transition-colors"
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+      </header>
+
       <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto p-6 md:p-8">
-          {children}
-        </div>
+        {children}
       </main>
     </div>
   );
