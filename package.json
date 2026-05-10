@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "Local documentation hub — normalize multiple doc sources into a unified searchable bundle",
+  "type": "module",
+  "bin": {
+    "dockit": "./bin/dockit.js"
+  },
   "workspaces": [
     "apps/server",
     "apps/client"
