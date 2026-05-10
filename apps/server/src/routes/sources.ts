@@ -5,7 +5,7 @@ import type { Source, Entry, CreateSourceInput, UpdateSourceInput, SourceType } 
 
 const router = Router({ mergeParams: true });
 
-const VALID_TYPES: SourceType[] = ['zip', 'antora', 'maven', 'asciidoc'];
+const VALID_TYPES: SourceType[] = ['zip', 'antora', 'maven', 'asciidoc', 'github-markdown'];
 
 function validateMavenConfig(config: Record<string, unknown>): string | null {
   if (!config.groupId || typeof config.groupId !== 'string') return 'groupId is required';
@@ -37,12 +37,20 @@ function validateAsciidocConfig(config: Record<string, unknown>): string | null 
   return null;
 }
 
+function validateGithubMarkdownConfig(config: Record<string, unknown>): string | null {
+  const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
+  const hasLocalPath = config.localPath && typeof config.localPath === 'string';
+  if (!hasRepoUrl && !hasLocalPath) return 'repoUrl or localPath is required';
+  return null;
+}
+
 function validateConfig(type: SourceType, config: Record<string, unknown>): string | null {
   switch (type) {
     case 'maven': return validateMavenConfig(config);
     case 'zip': return validateZipConfig(config);
     case 'antora': return validateAntoraConfig(config);
     case 'asciidoc': return validateAsciidocConfig(config);
+    case 'github-markdown': return validateGithubMarkdownConfig(config);
   }
 }
 

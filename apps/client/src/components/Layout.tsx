@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { BookOpen, Sun, Moon, Plus } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import GlobalSearchBar from './GlobalSearchBar';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -26,6 +27,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             Entries
           </Link>
         </nav>
+
+        <GlobalSearchBar />
 
         <div className="flex-1" />
 

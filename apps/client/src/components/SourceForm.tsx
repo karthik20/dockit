@@ -13,6 +13,7 @@ const TYPE_LABELS: Record<SourceType, string> = {
   antora: 'Antora',
   maven: 'Maven',
   asciidoc: 'AsciiDoc',
+  'github-markdown': 'GitHub Markdown',
 };
 
 type ZipMode = 'remote' | 'local';
@@ -40,11 +41,17 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
     if (c?.zipPath && !c?.repoUrl) return 'zipFile';
     return 'git';
   }
+  function getInitialGhmdMode(): RepoMode {
+    const c = initial?.config as Record<string, unknown> | undefined;
+    if (c?.localPath) return 'localDir';
+    return 'git';
+  }
 
   const [zipMode, setZipMode] = useState<ZipMode>(getInitialMode());
   const [mavenMode, setMavenMode] = useState<MavenMode>(getInitialMavenMode());
   const [antoraMode, setAntoraMode] = useState<RepoMode>(getInitialRepoMode());
   const [adocMode, setAdocMode] = useState<RepoMode>(getInitialRepoMode());
+  const [ghmdMode, setGhmdMode] = useState<RepoMode>(getInitialGhmdMode());
 
   const [zipUrl, setZipUrl] = useState((initial?.config as { url?: string })?.url || '');
   const [zipLocalPath, setZipLocalPath] = useState((initial?.config as { localPath?: string })?.localPath || '');
@@ -60,6 +67,10 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
   const [adocSourcePath, setAdocSourcePath] = useState((initial?.config as { sourcePath?: string })?.sourcePath || '');
   const [adocZipPath, setAdocZipPath] = useState((initial?.config as { zipPath?: string })?.zipPath || '');
   const [adocLocalPath, setAdocLocalPath] = useState((initial?.config as { localPath?: string })?.localPath || '');
+  const [ghmdRepoUrl, setGhmdRepoUrl] = useState((initial?.config as { repoUrl?: string })?.repoUrl || '');
+  const [ghmdLocalPath, setGhmdLocalPath] = useState((initial?.config as { localPath?: string })?.localPath || '');
+  const [ghmdSourcePath, setGhmdSourcePath] = useState((initial?.config as { sourcePath?: string })?.sourcePath || '');
+  const [ghmdBranch, setGhmdBranch] = useState((initial?.config as { branch?: string })?.branch || '');
 
   if (!open) return null;
 
@@ -115,6 +126,15 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
           config = { zipPath: adocZipPath.trim(), sourcePath: adocSourcePath.trim() || undefined };
         }
         break;
+      case 'github-markdown':
+        if (ghmdMode === 'git') {
+          if (!ghmdRepoUrl.trim()) { setError('Repository URL is required'); return; }
+          config = { repoUrl: ghmdRepoUrl.trim(), sourcePath: ghmdSourcePath.trim() || undefined, branch: ghmdBranch.trim() || undefined };
+        } else {
+          if (!ghmdLocalPath.trim()) { setError('Local path is required'); return; }
+          config = { localPath: ghmdLocalPath.trim(), sourcePath: ghmdSourcePath.trim() || undefined };
+        }
+        break;
     }
 
     setSaving(true);
@@ -153,8 +173,8 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className={labelClass}>Type</label>
-            <div className="flex gap-2">
-              {(['zip', 'maven', 'antora', 'asciidoc'] as SourceType[]).map((t) => (
+            <div className="flex gap-2 flex-wrap">
+              {(['zip', 'maven', 'antora', 'asciidoc', 'github-markdown'] as SourceType[]).map((t) => (
                 <button key={t} type="button" onClick={() => setType(t)}
                   className={modeBtnClass(type === t)}>
                   {TYPE_LABELS[t]}
@@ -309,6 +329,45 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
                   placeholder="e.g. docs/src/main/asciidoc" className={inputClass} />
                 <p className={helpClass}>Path within the source where .adoc files are located. Leave empty to scan entire source.</p>
               </div>
+            </div>
+          )}
+
+          {type === 'github-markdown' && (
+            <div className="space-y-3">
+              <div>
+                <label className={labelClass}>Source</label>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => setGhmdMode('git')} className={modeBtnClass(ghmdMode === 'git')}>Git Repo</button>
+                  <button type="button" onClick={() => setGhmdMode('localDir')} className={modeBtnClass(ghmdMode === 'localDir')}>Local Dir</button>
+                </div>
+              </div>
+              {ghmdMode === 'git' && (
+                <div>
+                  <label className={labelClass}>Repository URL</label>
+                  <input type="text" value={ghmdRepoUrl} onChange={(e) => setGhmdRepoUrl(e.target.value)} placeholder="https://github.com/reactjs/react.dev.git" className={inputClass} />
+                </div>
+              )}
+              {ghmdMode === 'localDir' && (
+                <div>
+                  <label className={labelClass}>Directory Path</label>
+                  <input type="text" value={ghmdLocalPath} onChange={(e) => setGhmdLocalPath(e.target.value)} placeholder="/home/user/repos/react.dev" className={inputClass} />
+                  <p className={helpClass}>Absolute path to a pre-cloned repository with .md files.</p>
+                </div>
+              )}
+              <div>
+                <label className={labelClass}>Source Path <span className="text-text-muted font-normal">(optional)</span></label>
+                <input type="text" value={ghmdSourcePath} onChange={(e) => setGhmdSourcePath(e.target.value)}
+                  placeholder="e.g. src/content" className={inputClass} />
+                <p className={helpClass}>Path within the source where .md files are located. Leave empty to scan entire source.</p>
+              </div>
+              {ghmdMode === 'git' && (
+                <div>
+                  <label className={labelClass}>Branch <span className="text-text-muted font-normal">(optional)</span></label>
+                  <input type="text" value={ghmdBranch} onChange={(e) => setGhmdBranch(e.target.value)}
+                    placeholder="e.g. main" className={inputClass} />
+                  <p className={helpClass}>Git branch to clone. Defaults to the repository default branch.</p>
+                </div>
+              )}
             </div>
           )}
 

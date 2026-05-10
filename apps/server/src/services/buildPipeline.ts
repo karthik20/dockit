@@ -1,10 +1,11 @@
 import path from 'node:path';
 import { v4 as uuid } from 'uuid';
 import { getDb, getSources } from '../db/index.js';
-import type { Entry, ZipSourceConfig, AntoraSourceConfig, MavenSourceConfig, AsciidocSourceConfig } from '../types.js';
+import type { Entry, ZipSourceConfig, AntoraSourceConfig, MavenSourceConfig, AsciidocSourceConfig, GithubMarkdownSourceConfig } from '../types.js';
 import { downloadAndExtractZip } from './zip.js';
 import { buildAntoraSource } from './antora.js';
 import { buildAsciidocSource } from './asciidoc.js';
+import { buildGithubMarkdownSource } from './githubMarkdown.js';
 import { downloadAndExtractMavenJar } from './maven.js';
 import { normalizeDocs } from './normalizer.js';
 import { buildSearchIndex } from './indexer.js';
@@ -70,6 +71,12 @@ export async function buildEntry(entryId: string): Promise<BuildResult> {
           case 'asciidoc': {
             const config = source.config as AsciidocSourceConfig;
             await buildAsciidocSource(config, sourceDir, log);
+            normalizedSources.push({ label: source.label, dir: sourceDir });
+            break;
+          }
+          case 'github-markdown': {
+            const config = source.config as GithubMarkdownSourceConfig;
+            await buildGithubMarkdownSource(config, sourceDir, log);
             normalizedSources.push({ label: source.label, dir: sourceDir });
             break;
           }

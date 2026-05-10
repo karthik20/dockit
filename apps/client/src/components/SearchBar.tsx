@@ -1,14 +1,15 @@
 import { useState, useCallback } from 'react';
-import { Search, FileText } from 'lucide-react';
+import { Search, FileText, Filter } from 'lucide-react';
 import type { SearchResult } from '../types';
 import { api } from '../api/client';
 
 interface Props {
   entryId: string;
   onSelectFile: (path: string) => void;
+  scopeLabel?: string;
 }
 
-export default function SearchBar({ entryId, onSelectFile }: Props) {
+export default function SearchBar({ entryId, onSelectFile, scopeLabel }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,21 +43,29 @@ export default function SearchBar({ entryId, onSelectFile }: Props) {
 
   return (
     <div className="relative">
-      <div className="relative">
-        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleChange(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder="Search documentation..."
-          className="w-full pl-10 pr-3 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-        />
-        {loading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="w-4 h-4 border-2 border-border border-t-primary rounded-full animate-spin" />
-          </div>
+      <div className="flex items-center gap-2">
+        {scopeLabel && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-text-muted bg-bg-alt ring-1 ring-border shrink-0">
+            <Filter size={10} />
+            {scopeLabel}
+          </span>
         )}
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => handleChange(e.target.value)}
+            onFocus={() => results.length > 0 && setOpen(true)}
+            placeholder="Search documentation..."
+            className="w-full pl-10 pr-3 py-2.5 bg-surface ring-1 ring-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+          />
+          {loading && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-4 h-4 border-2 border-border border-t-primary rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
       </div>
 
       {open && results.length > 0 && (

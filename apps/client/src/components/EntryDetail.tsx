@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, Trash2, Play, Download, Plus,
-  Package, GitBranch, FileArchive, FileText, Loader2,
+  Package, GitBranch, FileArchive, FileText, Github, Loader2,
   CheckCircle, AlertCircle, Clock, MoreHorizontal,
 } from 'lucide-react';
 import type { EntryDetail as EntryDetailType, Source, SourceType, SourceConfig } from '../types';
@@ -17,6 +17,7 @@ const TYPE_ICONS: Record<SourceType, typeof Package> = {
   antora: GitBranch,
   maven: Package,
   asciidoc: FileText,
+  'github-markdown': Github,
 };
 
 const TYPE_LABELS: Record<SourceType, string> = {
@@ -24,6 +25,7 @@ const TYPE_LABELS: Record<SourceType, string> = {
   antora: 'Antora',
   maven: 'Maven',
   asciidoc: 'AsciiDoc',
+  'github-markdown': 'GitHub Markdown',
 };
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
@@ -36,6 +38,7 @@ const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg
 export default function EntryDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [entry, setEntry] = useState<EntryDetailType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +63,13 @@ export default function EntryDetail() {
   }, [id]);
 
   useEffect(() => { fetchEntry(); }, [fetchEntry]);
+
+  useEffect(() => {
+    const doc = searchParams.get('doc');
+    if (doc) {
+      setSelectedFile(doc);
+    }
+  }, [searchParams]);
 
   const handleDeleteEntry = async () => {
     if (!entry) return;
@@ -275,7 +285,7 @@ export default function EntryDetail() {
       {/* Right panel: search + viewer */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="p-4 border-b border-border">
-          <SearchBar entryId={entry.id} onSelectFile={setSelectedFile} />
+          <SearchBar entryId={entry.id} onSelectFile={setSelectedFile} scopeLabel="Entry only" />
         </div>
         <div className="flex-1 overflow-auto p-4">
           <DocViewer entryId={entry.id} selectedFile={selectedFile} />
@@ -299,5 +309,6 @@ function getConfigSummary(source: Source): string {
     case 'maven': return `${c.groupId || '?'}:${c.artifactId || '?'}:${c.version || '?'}`;
     case 'antora': return c.localPath || c.repoUrl || c.zipPath || '';
     case 'asciidoc': return c.localPath || c.repoUrl || c.zipPath || '';
+    case 'github-markdown': return c.localPath || c.repoUrl || '';
   }
 }

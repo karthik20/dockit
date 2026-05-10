@@ -5,7 +5,7 @@ Dockit is a documentation index and search tool that provides on-demand access t
 ## When to Use Dockit
 
 Use dockit whenever the user asks about:
-- How to use a specific framework or library (e.g., Quarkus, Spring Boot)
+- How to use a specific framework or library (e.g., Quarkus, Spring Boot, React)
 - API documentation, class references, or configuration reference
 - Any technology listed in the available dockit entries
 

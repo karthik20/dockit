@@ -1,6 +1,6 @@
 # Dockit
 
-Local documentation hub that aggregates multiple documentation source types (ZIP, Maven, Antora, AsciiDoc) into a unified, searchable HTML bundle — useful as LLM context.
+Local documentation hub that aggregates multiple documentation source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown) into a unified, searchable HTML bundle — useful as LLM context.
 
 ## Quick Start
 
@@ -27,6 +27,7 @@ npm run -w apps/server mcp
 | **Maven Artifact** | Download a documentation JAR (javadoc) from Maven Central | *(none extra)* | `useMavenCommand: true` — uses local Maven + settings.xml; `localJar` — path to pre-downloaded .jar |
 | **Antora** | Build a multi-page HTML site with Antora | `repoUrl` | `localPath` — path to pre-cloned repo |
 | **AsciiDoc** | Convert `.adoc` files to HTML | `repoUrl`, `sourcePath` (optional) | `localPath` — path to pre-cloned repo |
+| **GitHub Markdown** | Clone a GitHub repo and convert `.md` files to HTML | `repoUrl`, `sourcePath` (optional), `branch` (optional) | `localPath` — path to pre-cloned repo |
 
 ## Offline / Proxy Mode
 
@@ -57,6 +58,8 @@ entries:
 ```
 
 **Maven `useMavenCommand`** spawns `mvn org.apache.maven.plugins:maven-dependency-plugin:3.10.0:copy`, respecting your local `~/.m2/settings.xml` (proxies, mirrors, private repos). Requires Maven installed and in `PATH`.
+
+**GitHub Markdown** clones the repository (shallow, depth 1), scans for `.md` files, strips YAML frontmatter, and converts to styled HTML using `marked`. The `sourcePath` field limits scanning to a subdirectory (e.g. `src/content` for React docs).
 
 **`localPath`** fields are validated at build time (not config sync), so files can be mounted later (e.g., Docker volumes).
 
@@ -189,3 +192,4 @@ dockit/
 | AsciiDoc | @asciidoctor/core |
 | Archives | unzipper |
 | Build Pipeline | Antora CLI, Git, Maven dependency plugin |
+| Markdown | marked |
