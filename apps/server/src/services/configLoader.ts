@@ -92,6 +92,11 @@ function validateSourceConfig(source: DockitSourceConfig): void {
         throw new Error(`AsciiDoc source "${source.label}" requires repoUrl, localPath, or zipPath`);
       }
       break;
+    case 'github-markdown':
+      if (!source.repoUrl && !source.localPath) {
+        throw new Error(`GitHub Markdown source "${source.label}" requires repoUrl or localPath`);
+      }
+      break;
     default:
       throw new Error(`Unknown source type: "${source.type}" in source "${source.label}"`);
   }
@@ -155,6 +160,13 @@ function buildSourceConfig(source: DockitSourceConfig): SourceConfig {
         zipPath: source.zipPath,
         localPath: source.localPath,
         sourcePath: source.sourcePath,
+      };
+    case 'github-markdown':
+      return {
+        repoUrl: source.repoUrl,
+        localPath: source.localPath,
+        sourcePath: source.sourcePath,
+        branch: source.branch,
       };
   }
 }

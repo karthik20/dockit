@@ -25,6 +25,16 @@ entries:
         version: "3.35.2"
         classifier: "javadoc"
 
+  - id: react
+    name: React
+    version: "19"
+    description: "React - The library for web and native user interfaces"
+    sources:
+      - type: github-markdown
+        label: "React Docs (Markdown)"
+        repoUrl: "https://github.com/reactjs/react.dev.git"
+        sourcePath: "src/content"
+
   # --- Local/Offline mode examples (uncomment to use) ---
 
   # - id: quarkus-local
@@ -70,6 +80,16 @@ entries:
   #     - type: zip
   #       label: "Docs ZIP"
   #       localPath: "/home/user/downloads/docs.zip"
+
+  # - id: react-local
+  #   name: React (Local)
+  #   version: "19"
+  #   description: "React docs from a pre-cloned repo"
+  #   sources:
+  #     - type: github-markdown
+  #       label: "React Docs (local)"
+  #       localPath: "/home/user/repos/react.dev"
+  #       sourcePath: "src/content"
 
 mcp:
   toolPrefix: "dockit_"

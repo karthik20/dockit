@@ -1,5 +1,5 @@
 export type EntryStatus = 'pending' | 'building' | 'ready' | 'error';
-export type SourceType = 'zip' | 'antora' | 'maven' | 'asciidoc';
+export type SourceType = 'zip' | 'antora' | 'maven' | 'asciidoc' | 'github-markdown';
 export type SourceStatus = 'pending' | 'building' | 'ready' | 'error';
 export type BuildStatus = 'pending' | 'building' | 'ready' | 'error';
 
@@ -41,7 +41,14 @@ export interface AsciidocSourceConfig {
   sourcePath?: string;
 }
 
-export type SourceConfig = ZipSourceConfig | AntoraSourceConfig | MavenSourceConfig | AsciidocSourceConfig;
+export interface GithubMarkdownSourceConfig {
+  repoUrl?: string;
+  localPath?: string;
+  sourcePath?: string;
+  branch?: string;
+}
+
+export type SourceConfig = ZipSourceConfig | AntoraSourceConfig | MavenSourceConfig | AsciidocSourceConfig | GithubMarkdownSourceConfig;
 
 export interface Source {
   id: string;

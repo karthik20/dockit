@@ -50,7 +50,7 @@ function initDb(database: Database.Database): void {
     CREATE TABLE IF NOT EXISTS sources (
       id TEXT PRIMARY KEY,
       entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-      type TEXT NOT NULL CHECK(type IN ('zip', 'antora', 'maven', 'asciidoc')),
+      type TEXT NOT NULL CHECK(type IN ('zip', 'antora', 'maven', 'asciidoc', 'github-markdown')),
       label TEXT NOT NULL,
       config TEXT NOT NULL DEFAULT '{}',
       status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'building', 'ready', 'error')),

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, Trash2, Play, Download, Plus,
-  Package, GitBranch, FileArchive, FileText, Loader2,
+  Package, GitBranch, FileArchive, FileText, Github, Loader2,
   CheckCircle, AlertCircle, Clock, MoreHorizontal,
 } from 'lucide-react';
 import type { EntryDetail as EntryDetailType, Source, SourceType, SourceConfig } from '../types';
@@ -17,6 +17,7 @@ const TYPE_ICONS: Record<SourceType, typeof Package> = {
   antora: GitBranch,
   maven: Package,
   asciidoc: FileText,
+  'github-markdown': Github,
 };
 
 const TYPE_LABELS: Record<SourceType, string> = {
@@ -24,6 +25,7 @@ const TYPE_LABELS: Record<SourceType, string> = {
   antora: 'Antora',
   maven: 'Maven',
   asciidoc: 'AsciiDoc',
+  'github-markdown': 'GitHub Markdown',
 };
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
@@ -299,5 +301,6 @@ function getConfigSummary(source: Source): string {
     case 'maven': return `${c.groupId || '?'}:${c.artifactId || '?'}:${c.version || '?'}`;
     case 'antora': return c.localPath || c.repoUrl || c.zipPath || '';
     case 'asciidoc': return c.localPath || c.repoUrl || c.zipPath || '';
+    case 'github-markdown': return c.localPath || c.repoUrl || '';
   }
 }
