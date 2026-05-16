@@ -2,9 +2,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { parse, HTMLElement } from 'node-html-parser';
 import type { ISearchEngine } from '../../../core/ports/ISearchEngine.js';
+import type { IEntryReadModel } from '../../../core/ports/IEntryReadModel.js';
 import type { SearchResult, GlobalSearchResult, HtmlFile } from '../../../core/domain/types.js';
 import { DATA_ROOT } from '../../../services/paths.js';
-import { getDb } from '../../persistence/sqlite/connection.js';
 import { EmbeddingService } from './EmbeddingService.js';
 import type { Connection, Table } from '@lancedb/lancedb';
 
@@ -39,10 +39,29 @@ interface LanceDoc {
   vector: Float32Array;
 }
 
+interface LanceDbQueryResult {
+  path: string;
+  primaryTitle: string;
+  sectionTitle: string;
+  content: string;
+  headings: string;
+  entryId: string;
+  vector: Float32Array;
+  _distance: number;
+  _score?: number;
+  _query?: string;
+}
+
 export class VectorSearchEngine implements ISearchEngine {
   readonly capability = 'vector' as const;
-  private embeddingService = new EmbeddingService();
+  private embeddingService: EmbeddingService;
   private dbPromise: Promise<Connection> | null = null;
+  private entryReadModel: IEntryReadModel;
+
+  constructor(entryReadModel: IEntryReadModel, embeddingService?: EmbeddingService) {
+    this.entryReadModel = entryReadModel;
+    this.embeddingService = embeddingService ?? new EmbeddingService();
+  }
 
   private async getDb(): Promise<Connection> {
     if (!this.dbPromise) {
@@ -147,6 +166,7 @@ export class VectorSearchEngine implements ISearchEngine {
     }
 
     // Create LanceDB table
+    // LanceDB types require Record<string, unknown> for createTable; Float32Array vectors don't satisfy this
     const table = await db.createTable(tableName, allChunks as any[], {
       mode: 'overwrite',
     });
@@ -192,11 +212,7 @@ export class VectorSearchEngine implements ISearchEngine {
 
   async globalSearch(query: string, limit = 30): Promise<GlobalSearchResult[]> {
     const db = await this.getDb();
-    const sqliteDb = getDb();
-
-    const readyEntries = sqliteDb.prepare(
-      "SELECT id, name, version FROM entries WHERE status = 'ready' ORDER BY name"
-    ).all() as { id: string; name: string; version: string }[];
+    const readyEntries = await this.entryReadModel.listReadyEntries();
 
     if (readyEntries.length === 0) return [];
 
@@ -246,15 +262,15 @@ export class VectorSearchEngine implements ISearchEngine {
         .toArray(),
     ]);
 
-    const vec = vecResults.status === 'fulfilled' ? (vecResults.value as any[]) : [];
-    const fts = ftsResults.status === 'fulfilled' ? (ftsResults.value as any[]) : [];
+    const vec = vecResults.status === 'fulfilled' ? (vecResults.value as LanceDbQueryResult[]) : [];
+    const fts = ftsResults.status === 'fulfilled' ? (ftsResults.value as LanceDbQueryResult[]) : [];
 
     if (vec.length === 0 && fts.length === 0) return [];
 
     // If only one query succeeded, use its results directly
     if (vec.length === 0) {
       return this.deduplicateByPath(
-        fts.map((r: any) => ({
+        fts.map((r: LanceDbQueryResult) => ({
           path: r.path,
           title: r.primaryTitle || r.sectionTitle,
           headings: r.headings ? r.headings.split(' | ') : [],
@@ -265,7 +281,7 @@ export class VectorSearchEngine implements ISearchEngine {
 
     if (fts.length === 0) {
       return this.deduplicateByPath(
-        vec.map((r: any) => ({
+        vec.map((r: LanceDbQueryResult) => ({
           path: r.path,
           title: r.primaryTitle || r.sectionTitle,
           headings: r.headings ? r.headings.split(' | ') : [],
@@ -279,7 +295,7 @@ export class VectorSearchEngine implements ISearchEngine {
     return fused;
   }
 
-  private hybridFuse(vecResults: any[], ftsResults: any[], limit: number): SearchResult[] {
+  private hybridFuse(vecResults: LanceDbQueryResult[], ftsResults: LanceDbQueryResult[], limit: number): SearchResult[] {
     // Deduplicate: keep only best chunk per path BEFORE RRF fusion.
     const dedupVec = this.dedupBest(vecResults, (r) => r._distance ?? Infinity, 'asc');
     let dedupFts = this.dedupBest(ftsResults, (r) => r._score ?? 0, 'desc');

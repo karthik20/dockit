@@ -1,17 +1,8 @@
 import type { IEntryRepository } from '../ports/IEntryRepository.js';
 import type { ISourceRepository } from '../ports/ISourceRepository.js';
 import type { Entry, Source, CreateEntryInput, UpdateEntryInput, CreateSourceInput, UpdateSourceInput } from '../domain/types.js';
-
-function generateEntryId(name: string, version: string): string {
-  const namePart = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  const versionPart = version
-    .toLowerCase()
-    .replace(/[^a-z0-9x]+/g, '');
-  return `${namePart}-${versionPart}`;
-}
+import { NotFoundError, ValidationError } from '../domain/errors.js';
+import { generateEntryId } from '../domain/entry.js';
 
 export class ConfigUseCase {
   constructor(
@@ -35,27 +26,39 @@ export class ConfigUseCase {
   }
 
   async createEntry(input: CreateEntryInput): Promise<Entry> {
+    if (!input.name?.trim()) throw new ValidationError('Entry name is required', 'name', input.name);
+    if (!input.version?.trim()) throw new ValidationError('Entry version is required', 'version', input.version);
     const id = input.id ?? generateEntryId(input.name, input.version);
     return this.entryRepo.create({ ...input, id });
   }
 
   async updateEntry(id: string, input: UpdateEntryInput): Promise<void> {
+    const existing = await this.entryRepo.findById(id);
+    if (!existing) throw new NotFoundError('Entry', id);
     await this.entryRepo.update(id, input);
   }
 
   async deleteEntry(id: string): Promise<void> {
+    const existing = await this.entryRepo.findById(id);
+    if (!existing) throw new NotFoundError('Entry', id);
     await this.entryRepo.delete(id);
   }
 
   async createSource(entryId: string, input: CreateSourceInput): Promise<Source> {
+    const entry = await this.entryRepo.findById(entryId);
+    if (!entry) throw new NotFoundError('Entry', entryId);
     return this.sourceRepo.create(entryId, input);
   }
 
   async updateSource(id: string, input: UpdateSourceInput): Promise<void> {
+    const existing = await this.sourceRepo.findById(id);
+    if (!existing) throw new NotFoundError('Source', id);
     await this.sourceRepo.update(id, input);
   }
 
   async deleteSource(id: string): Promise<void> {
+    const existing = await this.sourceRepo.findById(id);
+    if (!existing) throw new NotFoundError('Source', id);
     await this.sourceRepo.delete(id);
   }
 }

@@ -6,12 +6,20 @@ import { getDb } from './infrastructure/persistence/sqlite/connection.js';
 import { SqliteEntryRepository } from './infrastructure/persistence/sqlite/SqliteEntryRepository.js';
 import { SqliteSourceRepository } from './infrastructure/persistence/sqlite/SqliteSourceRepository.js';
 import { SqliteBuildRepository } from './infrastructure/persistence/sqlite/SqliteBuildRepository.js';
+import { SqliteEntryReadModel } from './infrastructure/persistence/sqlite/SqliteEntryReadModel.js';
 import { createSearchEngine } from './infrastructure/search/SearchEngineFactory.js';
 import { SearchUseCase } from './core/usecases/SearchUseCase.js';
 import { BuildUseCase } from './core/usecases/BuildUseCase.js';
 import { ConfigUseCase } from './core/usecases/ConfigUseCase.js';
 import { FileSystemDocumentStore } from './infrastructure/filesystem/FileSystemDocumentStore.js';
 import { extractTextFromHtml } from './services/textExtractor.js';
+import { ZipSourceProcessor } from './infrastructure/source-processors/ZipSourceProcessor.js';
+import { AntoraSourceProcessor } from './infrastructure/source-processors/AntoraSourceProcessor.js';
+import { AsciidocSourceProcessor } from './infrastructure/source-processors/AsciidocSourceProcessor.js';
+import { MavenSourceProcessor } from './infrastructure/source-processors/MavenSourceProcessor.js';
+import { GithubMarkdownSourceProcessor } from './infrastructure/source-processors/GithubMarkdownSourceProcessor.js';
+import { DocumentNormalizer } from './infrastructure/source-processors/DocumentNormalizer.js';
+import { PathResolver } from './infrastructure/source-processors/PathResolver.js';
 import { DATA_ROOT } from './services/paths.js';
 
 const PROJECT_ROOT = path.resolve(DATA_ROOT, '..', '..');
@@ -25,18 +33,33 @@ const config = loadConfig(configPath);
 const toolPrefix = config.mcp?.toolPrefix || 'dockit_';
 const maxResults = config.mcp?.maxSearchResults || 10;
 
-syncConfigToDb(config);
-
 async function main() {
   const db = getDb();
   const entryRepo = new SqliteEntryRepository(db);
   const sourceRepo = new SqliteSourceRepository(db);
   const buildRepo = new SqliteBuildRepository(db);
-  const searchEngine = await createSearchEngine(config.search?.engine);
+
+  await syncConfigToDb(config, entryRepo, sourceRepo);
+  const entryReadModel = new SqliteEntryReadModel(db);
+  const searchEngine = await createSearchEngine(entryReadModel, config.search?.engine);
 
   const configUseCase = new ConfigUseCase(entryRepo, sourceRepo);
   const searchUseCase = new SearchUseCase(searchEngine);
-  const buildUseCase = new BuildUseCase(buildRepo, sourceRepo, entryRepo, searchEngine);
+
+  const processors = [
+    new ZipSourceProcessor(),
+    new AntoraSourceProcessor(),
+    new AsciidocSourceProcessor(),
+    new MavenSourceProcessor(),
+    new GithubMarkdownSourceProcessor(),
+  ];
+  const documentNormalizer = new DocumentNormalizer();
+  const pathResolver = new PathResolver();
+
+  const buildUseCase = new BuildUseCase(
+    buildRepo, sourceRepo, entryRepo, searchEngine,
+    processors, documentNormalizer, pathResolver,
+  );
   const docStore = new FileSystemDocumentStore();
 
   if (config.mcp?.autoBuild) {

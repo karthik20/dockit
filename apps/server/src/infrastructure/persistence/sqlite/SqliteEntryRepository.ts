@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { Entry, CreateEntryInput, UpdateEntryInput } from '../../../core/domain/types.js';
 import type { IEntryRepository } from '../../../core/ports/IEntryRepository.js';
+import { DomainError } from '../../../core/domain/errors.js';
 import { getDb } from './connection.js';
 
 export class SqliteEntryRepository implements IEntryRepository {
@@ -28,13 +29,6 @@ export class SqliteEntryRepository implements IEntryRepository {
     this.db.prepare(
       'INSERT OR REPLACE INTO entries (id, name, version, description, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(entry.id, entry.name, entry.version, entry.description, entry.status, entry.created_at, entry.updated_at);
-  }
-
-  async upsert(id: string, name: string, version: string, description: string): Promise<void> {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO entries (id, name, version, description, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `).run(id, name, version, description, 'pending');
   }
 
   async update(id: string, input: UpdateEntryInput): Promise<void> {
@@ -81,7 +75,7 @@ export class SqliteEntryRepository implements IEntryRepository {
       'INSERT INTO entries (id, name, version, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(id, input.name, input.version, input.description ?? '', now, now);
     const entry = await this.findById(id);
-    if (!entry) throw new Error('Failed to create entry');
+    if (!entry) throw new DomainError('Failed to create entry', 'PERSISTENCE_ERROR');
     return entry;
   }
 }

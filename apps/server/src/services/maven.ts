@@ -4,7 +4,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawn } from 'node:child_process';
 import unzipper from 'unzipper';
-import type { MavenSourceConfig } from '../types.js';
+import type { MavenSourceConfig } from '../core/domain/types.js';
 
 function buildMavenUrl(config: MavenSourceConfig): string {
   const groupPath = config.groupId.replace(/\./g, '/');

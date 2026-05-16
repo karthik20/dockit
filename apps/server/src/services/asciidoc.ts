@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import unzipper from 'unzipper';
 import asciidoctorModule from '@asciidoctor/core';
-import type { AsciidocSourceConfig } from '../types.js';
+import type { AsciidocSourceConfig } from '../core/domain/types.js';
 
 type Processor = {
   convertFile(file: string, options?: Record<string, unknown>): unknown;
