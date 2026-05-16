@@ -32,6 +32,9 @@ export interface DockitEntryConfig {
 
 export interface DockitConfig {
   entries: DockitEntryConfig[];
+  search?: {
+    engine?: 'json' | 'vector';
+  };
   mcp?: {
     toolPrefix?: string;
     maxSearchResults?: number;

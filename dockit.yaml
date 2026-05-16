@@ -91,6 +91,9 @@ entries:
   #       localPath: "/home/user/repos/react.dev"
   #       sourcePath: "src/content"
 
+search:
+  engine: json  # 'json' (default, low-resource) | 'vector' (requires @lancedb/lancedb + @dockit/embeddings)
+
 mcp:
   toolPrefix: "dockit_"
   maxSearchResults: 10

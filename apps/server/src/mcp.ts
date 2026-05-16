@@ -2,12 +2,18 @@ import { McpServer, StdioServerTransport, fromJsonSchema } from '@modelcontextpr
 import path from 'node:path';
 import fs from 'node:fs';
 import { loadConfig, syncConfigToDb } from './services/configLoader.js';
-import { buildEntry } from './services/buildPipeline.js';
-import { getDb, getSources } from './db/index.js';
-import { searchIndex } from './services/indexer.js';
+import { getDb } from './infrastructure/persistence/sqlite/connection.js';
+import { SqliteEntryRepository } from './infrastructure/persistence/sqlite/SqliteEntryRepository.js';
+import { SqliteSourceRepository } from './infrastructure/persistence/sqlite/SqliteSourceRepository.js';
+import { SqliteBuildRepository } from './infrastructure/persistence/sqlite/SqliteBuildRepository.js';
+import { createSearchEngine } from './infrastructure/search/SearchEngineFactory.js';
+import { SearchUseCase } from './core/usecases/SearchUseCase.js';
+import { BuildUseCase } from './core/usecases/BuildUseCase.js';
+import { ConfigUseCase } from './core/usecases/ConfigUseCase.js';
+import { FileSystemDocumentStore } from './infrastructure/filesystem/FileSystemDocumentStore.js';
 import { extractTextFromHtml } from './services/textExtractor.js';
 import { DATA_ROOT } from './services/paths.js';
-import type { Entry } from './types.js';
+import type { SearchEngineType } from './core/domain/types.js';
 
 const PROJECT_ROOT = path.resolve(DATA_ROOT, '..', '..');
 
@@ -22,11 +28,22 @@ const maxResults = config.mcp?.maxSearchResults || 10;
 
 syncConfigToDb(config);
 
+const db = getDb();
+const entryRepo = new SqliteEntryRepository(db);
+const sourceRepo = new SqliteSourceRepository(db);
+const buildRepo = new SqliteBuildRepository(db);
+const searchEngine = createSearchEngine(config.search?.engine);
+
+const configUseCase = new ConfigUseCase(entryRepo, sourceRepo);
+const searchUseCase = new SearchUseCase(searchEngine);
+const buildUseCase = new BuildUseCase(buildRepo, sourceRepo, searchEngine);
+const docStore = new FileSystemDocumentStore();
+
 if (config.mcp?.autoBuild) {
   console.error('[dockit] Auto-building all entries...');
   for (const entryConfig of config.entries) {
     try {
-      const result = await buildEntry(entryConfig.id);
+      const result = await buildUseCase.build(entryConfig.id);
       console.error(`[dockit] ${entryConfig.id}: ${result.status}`);
     } catch (err) {
       console.error(`[dockit] ${entryConfig.id}: build error - ${(err as Error).message}`);
@@ -45,26 +62,14 @@ server.registerTool(
     description: 'List all available documentation entries with their status and source count.',
   },
   async () => {
-    const db = getDb();
-    const entries = db.prepare('SELECT id, name, version, description, status FROM entries ORDER BY name').all() as Entry[];
-    const entryList = entries.map((e) => {
-      const sources = getSources(e.id);
-      return {
-        id: e.id,
-        name: e.name,
-        version: e.version,
-        description: e.description,
-        status: e.status,
-        sourceCount: sources.length,
-      };
-    });
+    const entries = await configUseCase.listEntries();
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify(entryList, null, 2) }],
+      content: [{ type: 'text' as const, text: JSON.stringify(entries, null, 2) }],
     };
   },
 );
 
-  server.registerTool(
+server.registerTool(
   `${toolPrefix}search`,
   {
     description:
@@ -91,8 +96,7 @@ server.registerTool(
       };
     }
 
-    const indexPath = path.join(DATA_ROOT, entryStr, 'index.json');
-    const results = searchIndex(indexPath, queryStr, resultLimit);
+    const results = await searchUseCase.searchEntry(entryStr, queryStr, resultLimit);
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
@@ -125,15 +129,15 @@ server.registerTool(
       };
     }
 
-    const filePath = path.join(DATA_ROOT, entryStr, 'bundle', docPathStr);
-    if (!fs.existsSync(filePath)) {
+    const exists = await docStore.documentExists(entryStr, docPathStr);
+    if (!exists) {
       return {
         content: [{ type: 'text' as const, text: `Document not found: ${docPathStr}. Has the entry been built?` }],
         isError: true,
       };
     }
 
-    const html = fs.readFileSync(filePath, 'utf-8');
+    const html = await docStore.getDocument(entryStr, docPathStr);
     const text = extractTextFromHtml(html);
 
     return {
@@ -165,8 +169,7 @@ server.registerTool(
       };
     }
 
-    const db = getDb();
-    const entryRecord = db.prepare('SELECT * FROM entries WHERE id = ?').get(entryStr) as Entry | undefined;
+    const entryRecord = await configUseCase.getEntry(entryStr);
     if (!entryRecord) {
       return {
         content: [{ type: 'text' as const, text: `Entry not found: ${entryStr}` }],
@@ -180,7 +183,7 @@ server.registerTool(
       };
     }
 
-    buildEntry(entryStr).then((result) => {
+    buildUseCase.build(entryStr).then((result) => {
       console.error(`[dockit] Build ${entryStr}: ${result.status}`);
     });
 
@@ -212,8 +215,7 @@ server.registerTool(
       };
     }
 
-    const db = getDb();
-    const build = db.prepare('SELECT * FROM builds WHERE entry_id = ? ORDER BY started_at DESC LIMIT 1').get(entryStr) as { status: string; log: string; started_at: string; finished_at: string } | undefined;
+    const build = await buildRepo.findLatest(entryStr);
 
     if (!build) {
       return {
@@ -246,13 +248,14 @@ server.registerTool(
   },
   async ({ query }: any) => {
     const queryStr = (query as string).toLowerCase();
-    const db = getDb();
-    const entries = db.prepare(
-      "SELECT id, name, version, description, status FROM entries WHERE LOWER(name) LIKE ? OR LOWER(COALESCE(description,'')) LIKE ? ORDER BY name"
-    ).all(`%${queryStr}%`, `%${queryStr}%`) as Entry[];
+    const entries = await entryRepo.findAll();
+    const filtered = entries.filter((e) =>
+      e.name.toLowerCase().includes(queryStr) ||
+      (e.description || '').toLowerCase().includes(queryStr)
+    );
 
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify(entries, null, 2) }],
+      content: [{ type: 'text' as const, text: JSON.stringify(filtered, null, 2) }],
     };
   },
 );
@@ -281,29 +284,10 @@ server.registerTool(
       };
     }
 
-    const db = getDb();
-    const readyEntries = db.prepare("SELECT id, name, version FROM entries WHERE status = 'ready' ORDER BY name").all() as Entry[];
-
-    const allResults: Array<Record<string, unknown>> = [];
-    for (const entry of readyEntries) {
-      const indexPath = path.join(DATA_ROOT, entry.id, 'index.json');
-      const results = searchIndex(indexPath, queryStr, 10);
-      for (const r of results) {
-        allResults.push({
-          entryId: entry.id,
-          entryName: entry.name,
-          entryVersion: entry.version,
-          ...r,
-        });
-      }
-    }
-
-    // Sort by relevance (score) and truncate
-    allResults.sort((a, b) => ((b as any).score || 0) - ((a as any).score || 0));
-    const limited = allResults.slice(0, resultLimit);
+    const results = await searchUseCase.globalSearch(queryStr, resultLimit);
 
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify(limited, null, 2) }],
+      content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
     };
   },
 );
