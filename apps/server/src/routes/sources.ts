@@ -1,91 +1,96 @@
 import { Router, Request, Response } from 'express';
-import { v4 as uuid } from 'uuid';
-import { getDb, getSources, getSource } from '../db/index.js';
-import type { Source, Entry, CreateSourceInput, UpdateSourceInput, SourceType } from '../types.js';
-
-const router = Router({ mergeParams: true });
+import type { ConfigUseCase } from '../core/usecases/ConfigUseCase.js';
+import type { SourceType } from '../core/domain/types.js';
 
 const VALID_TYPES: SourceType[] = ['zip', 'antora', 'maven', 'asciidoc', 'github-markdown'];
 
-function validateMavenConfig(config: Record<string, unknown>): string | null {
-  if (!config.groupId || typeof config.groupId !== 'string') return 'groupId is required';
-  if (!config.artifactId || typeof config.artifactId !== 'string') return 'artifactId is required';
-  if (!config.version || typeof config.version !== 'string') return 'version is required';
-  return null;
-}
-
-function validateZipConfig(config: Record<string, unknown>): string | null {
-  const hasUrl = config.url && typeof config.url === 'string';
-  const hasLocalPath = config.localPath && typeof config.localPath === 'string';
-  if (!hasUrl && !hasLocalPath) return 'url or localPath is required';
-  return null;
-}
-
-function validateAntoraConfig(config: Record<string, unknown>): string | null {
-  const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
-  const hasZipPath = config.zipPath && typeof config.zipPath === 'string';
-  const hasLocalPath = config.localPath && typeof config.localPath === 'string';
-  if (!hasRepoUrl && !hasZipPath && !hasLocalPath) return 'repoUrl, localPath, or zipPath is required';
-  return null;
-}
-
-function validateAsciidocConfig(config: Record<string, unknown>): string | null {
-  const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
-  const hasZipPath = config.zipPath && typeof config.zipPath === 'string';
-  const hasLocalPath = config.localPath && typeof config.localPath === 'string';
-  if (!hasRepoUrl && !hasZipPath && !hasLocalPath) return 'repoUrl, localPath, or zipPath is required';
-  return null;
-}
-
-function validateGithubMarkdownConfig(config: Record<string, unknown>): string | null {
-  const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
-  const hasLocalPath = config.localPath && typeof config.localPath === 'string';
-  if (!hasRepoUrl && !hasLocalPath) return 'repoUrl or localPath is required';
-  return null;
-}
-
 function validateConfig(type: SourceType, config: Record<string, unknown>): string | null {
   switch (type) {
-    case 'maven': return validateMavenConfig(config);
-    case 'zip': return validateZipConfig(config);
-    case 'antora': return validateAntoraConfig(config);
-    case 'asciidoc': return validateAsciidocConfig(config);
-    case 'github-markdown': return validateGithubMarkdownConfig(config);
+    case 'maven':
+      if (!config.groupId || typeof config.groupId !== 'string') return 'groupId is required';
+      if (!config.artifactId || typeof config.artifactId !== 'string') return 'artifactId is required';
+      if (!config.version || typeof config.version !== 'string') return 'version is required';
+      return null;
+    case 'zip': {
+      const hasUrl = config.url && typeof config.url === 'string';
+      const hasLocalPath = config.localPath && typeof config.localPath === 'string';
+      if (!hasUrl && !hasLocalPath) return 'url or localPath is required';
+      return null;
+    }
+    case 'antora': {
+      const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
+      const hasZipPath = config.zipPath && typeof config.zipPath === 'string';
+      const hasLocalPath = config.localPath && typeof config.localPath === 'string';
+      if (!hasRepoUrl && !hasZipPath && !hasLocalPath) return 'repoUrl, localPath, or zipPath is required';
+      return null;
+    }
+    case 'asciidoc': {
+      const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
+      const hasZipPath = config.zipPath && typeof config.zipPath === 'string';
+      const hasLocalPath = config.localPath && typeof config.localPath === 'string';
+      if (!hasRepoUrl && !hasZipPath && !hasLocalPath) return 'repoUrl, localPath, or zipPath is required';
+      return null;
+    }
+    case 'github-markdown': {
+      const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
+      const hasLocalPath = config.localPath && typeof config.localPath === 'string';
+      if (!hasRepoUrl && !hasLocalPath) return 'repoUrl or localPath is required';
+      return null;
+    }
   }
 }
 
-router.post('/', (req: Request, res: Response) => {
-  const entryId = req.params.entryId as string;
-  const db = getDb();
-  const entry = db.prepare('SELECT * FROM entries WHERE id = ?').get(entryId) as Entry | undefined;
-  if (!entry) {
-    res.status(404).json({ error: 'Entry not found' });
-    return;
-  }
+export function createSourceRoutes(configUseCase: ConfigUseCase): Router {
+  const router = Router({ mergeParams: true });
 
-  const { type, label, config } = req.body as CreateSourceInput;
+  router.post('/', async (req: Request, res: Response) => {
+    const entryId = req.params.entryId as string;
+    const entry = await configUseCase.getEntry(entryId);
+    if (!entry) {
+      res.status(404).json({ error: 'Entry not found' });
+      return;
+    }
 
-  if (!type || !VALID_TYPES.includes(type)) {
-    res.status(400).json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` });
-    return;
-  }
-  if (!label) {
-    res.status(400).json({ error: 'label is required' });
-    return;
-  }
-  const configError = validateConfig(type, config as Record<string, unknown>);
-  if (configError) {
-    res.status(400).json({ error: configError });
-    return;
-  }
+    const { type, label, config } = req.body as { type: SourceType; label: string; config: Record<string, unknown> };
 
-  const id = uuid();
-  const now = new Date().toISOString();
-  db.prepare(
-    'INSERT INTO sources (id, entry_id, type, label, config, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(id, entryId, type, label, JSON.stringify(config), now);
-  const source = getSource(id);
-  res.status(201).json(source);
-});
+    if (!type || !VALID_TYPES.includes(type)) {
+      res.status(400).json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` });
+      return;
+    }
+    if (!label) {
+      res.status(400).json({ error: 'label is required' });
+      return;
+    }
+    const configError = validateConfig(type, config);
+    if (configError) {
+      res.status(400).json({ error: configError });
+      return;
+    }
 
-export default router;
+    const source = await configUseCase.createSource(entryId, { type, label, config: config as any });
+    res.status(201).json(source);
+  });
+
+  return router;
+}
+
+export function createSourceFlatRoutes(configUseCase: ConfigUseCase): Router {
+  const router = Router();
+
+  router.put('/:id', async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const input = req.body as { label?: string; config?: Record<string, unknown> };
+    await configUseCase.updateSource(id, input);
+    const { SqliteSourceRepository } = await import('../infrastructure/persistence/sqlite/SqliteSourceRepository.js');
+    const source = await new SqliteSourceRepository().findById(id);
+    res.json(source);
+  });
+
+  router.delete('/:id', async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    await configUseCase.deleteSource(id);
+    res.json({ success: true });
+  });
+
+  return router;
+}

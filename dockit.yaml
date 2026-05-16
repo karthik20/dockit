@@ -25,6 +25,24 @@ entries:
         version: "3.35.2"
         classifier: "javadoc"
 
+  - id: spring-boot
+    name: Spring Boot
+    version: "3.5.x"
+    description: "Spring Boot - Production-ready Spring applications"
+    sources:
+      - type: antora
+        label: "Spring Boot Reference Docs"
+        repoUrl: "https://github.com/spring-projects/spring-boot.git"
+
+  - id: spring-framework
+    name: Spring Framework
+    version: "7.x"
+    description: "Spring Framework - The core of the Spring ecosystem"
+    sources:
+      - type: antora
+        label: "Spring Framework Reference Docs"
+        repoUrl: "https://github.com/spring-projects/spring-framework.git"
+
   - id: react
     name: React
     version: "19"
@@ -90,6 +108,9 @@ entries:
   #       label: "React Docs (local)"
   #       localPath: "/home/user/repos/react.dev"
   #       sourcePath: "src/content"
+
+search:
+  engine: vector  # 'vector' (default, semantic search) | 'json' (fallback, low-resource)
 
 mcp:
   toolPrefix: "dockit_"

@@ -25,45 +25,46 @@ export default async function search(root, positional, flags) {
   const asJson = !!flags.json;
   const getTop = flags['get-top'] === true ? 3 : parseInt(String(flags['get-top']), 10);
 
-  const { getDb } = await import(path.join(root, 'apps/server/src/db/index.js'));
-  const { searchIndex } = await import(path.join(root, 'apps/server/src/services/indexer.js'));
+  const { getDb } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/connection.js'));
+  const { SqliteEntryRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteEntryRepository.js'));
+  const { SqliteSourceRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteSourceRepository.js'));
+  const { SqliteBuildRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteBuildRepository.js'));
+  const { createSearchEngine } = await import(path.join(root, 'apps/server/src/infrastructure/search/SearchEngineFactory.js'));
+  const { SearchUseCase } = await import(path.join(root, 'apps/server/src/core/usecases/SearchUseCase.js'));
+  const { loadConfig, syncConfigToDb } = await import(path.join(root, 'apps/server/src/services/configLoader.js'));
   const { DATA_ROOT } = await import(path.join(root, 'apps/server/src/services/paths.js'));
   const { extractTextFromHtml } = await import(path.join(root, 'apps/server/src/services/textExtractor.js'));
+
+  // Ensure DB is initialized
+  const db = getDb();
+
+  // Sync config to DB
+  const configPath = path.join(root, 'dockit.yaml');
+  const config = loadConfig(configPath);
+  syncConfigToDb(config);
+
+  const entryRepo = new SqliteEntryRepository(db);
+  const searchEngine = await createSearchEngine(config.search?.engine);
+  const searchUseCase = new SearchUseCase(searchEngine);
 
   let results: any[] = [];
   let scoped = false;
 
   if (entryId) {
     scoped = true;
-    const indexPath = path.join(DATA_ROOT, entryId, 'index.json');
-    if (!fs.existsSync(indexPath)) {
+    const entry = await entryRepo.findById(entryId);
+    if (!entry || entry.status !== 'ready') {
       console.error(`Entry "${entryId}" not found or not built.`);
       console.error('Run "dockit list" to see available entries.');
       process.exit(1);
     }
-    results = searchIndex(indexPath, query, limit).map((r) => ({
+    results = await searchUseCase.searchEntry(entryId, query, limit);
+    results = results.map((r) => ({
       entryId,
       ...r,
     }));
   } else {
-    const db = getDb();
-    const entries = db.prepare("SELECT id, name, version FROM entries WHERE status = 'ready' ORDER BY name").all();
-
-    // Global search: return top result per entry so LLM can pick the right one
-    for (const entry of entries) {
-      const indexPath = path.join(DATA_ROOT, entry.id, 'index.json');
-      const entryResults = searchIndex(indexPath, query, 1);
-      if (entryResults.length > 0) {
-        results.push({
-          entryId: entry.id,
-          entryName: entry.name,
-          entryVersion: entry.version,
-          ...entryResults[0],
-        });
-      }
-    }
-
-    results.sort((a, b) => (b.score || 0) - (a.score || 0));
+    results = await searchUseCase.globalSearch(query, limit);
   }
 
   if (getTop) {
@@ -87,7 +88,6 @@ export default async function search(root, positional, flags) {
         entryName: r.entryName,
         title: r.title,
         path: r.path,
-        score: r.score,
         content: r.content,
       }));
       console.log(JSON.stringify(output, null, 2));

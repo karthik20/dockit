@@ -8,11 +8,14 @@ export default async function status(root, positional, flags) {
     process.exit(1);
   }
 
-  const { getDb } = await import(path.join(root, 'apps/server/src/db/index.js'));
   const asJson = !!flags.json;
 
+  const { getDb } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/connection.js'));
+  const { SqliteBuildRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteBuildRepository.js'));
+
   const db = getDb();
-  const build = db.prepare('SELECT * FROM builds WHERE entry_id = ? ORDER BY started_at DESC LIMIT 1').get(entryId);
+  const buildRepo = new SqliteBuildRepository(db);
+  const build = await buildRepo.findLatest(entryId);
 
   if (!build) {
     if (asJson) {
