@@ -45,37 +45,74 @@ apps/server/src/
 
 ```yaml
 search:
-  engine: json    # 'json' (default, low-resource) | 'vector' (LanceDB + embeddings)
+  engine: vector    # 'vector' (default, hybrid semantic+keyword) | 'json' (TF-IDF fallback)
 ```
+
+**Default:** `vector` — hybrid search combining cosine vector similarity + BM25 keyword scoring via Reciprocal Rank Fusion.
 
 ## Two Search Engines
 
-| | JSON Engine | Vector Engine |
+| | JSON Engine | Vector Engine (Hybrid) |
 |---|---|---|
 | **Library** | None (custom TF-IDF) | LanceDB embedded + `@dockit/embeddings` |
 | **Resource** | Minimal | ~400MB model + ~200MB RAM |
-| **Build** | Extracts title/headings/snippet -> writes `index.json` | Chunks HTML into ~500-token segments -> embeds via all-MiniLM-L6-v2 -> stores in LanceDB collection per entry |
-| **Search** | TF-IDF scoring | Embed query -> cosine similarity ANN in LanceDB |
+| **Build** | Extracts title/headings/snippet -> writes `index.json` | Chunks HTML by h1-h4 headings -> embeds via all-MiniLM-L6-v2 (cosine) + creates FTS index on searchText -> stores in LanceDB table per entry |
+| **Search** | TF-IDF scoring (title 10x, headings 3x, snippet 1x) | **Hybrid**: parallel vector (cosine ANN) + BM25 FTS -> deduplicated per-page -> RRF (Reciprocal Rank Fusion) with dynamic FTS weighting |
+| **Embed text** | N/A | `title (2x) + sectionHeading + sectionText` (up to 2000 chars) |
+| **Fusion** | N/A | Deduplicate chunks by path -> RRF (k=25) -> dynamic FTS weight based on score distribution confidence -> title boosting (1.5x if query terms in title) |
 | **Cross-platform** | Yes | Yes (ONNX native bindings via `onnxruntime-node` for Linux, macOS, WSL2) |
+
+### Hybrid Search Architecture
+
+```
+query: "quarkus in memory cache caffeine"
+  │
+  ├─ Vector query: embed -> cosine ANN on vector index -> top 40
+  │      Deduplicate per path (keep best _distance)
+  │
+  ├─ FTS query:   BM25 on searchText column (includes title 2x) -> top 40
+  │      Deduplicate per path (keep best _score)
+  │      Filter: drop results < 30% of max BM25 score
+  │      Dynamic weight: if score gap > 1.3x, weight=2.0; else weight=0.7
+  │
+  └─ RRF Fusion:  RRF(path) = Σ[vec] 1/(k+rank) + weight * Σ[fts] 1/(k+rank)
+                   Sort by RRF score descending -> deduplicate -> return top N
+```
+
+### Search Quality Benchmarks (quarkus entry)
+
+| Query | JSON (TF-IDF) Top-5 Precision | Vector Hybrid Top-5 Precision |
+|-------|------|------|
+| `quarkus in memory cache caffeine` | 4/5 ✓ (main guide #1) | 2/5 (main guide #1 ✓, with section context) |
+| `reactive rest endpoint` | 4/5 ✓ | 4/5 ✓ (Writing REST Services #1) |
+| `@CacheResult annotation` | 1/5 (correct page #1) | 1/5 (correct page #1) |
+| `configure datasource postgresql` | 2/5 ✓ | 2/5 ✓ |
+| `native image build graalvm` | 2/5 ✓ | 3/5 ✓ (finds Tips for Native that JSON misses) |
+
+**Key improvements over original vector-only search:**
+- Main caching guide now reliably #1 (was missing from top 10 initially)
+- Section-level headings in results provide better context for technical docs
+- Hybrid FTS + RRF fusion recovers keyword precision that pure vector search loses
+- Dynamic FTS weighting adapts to query specificity (specific terms → rely on FTS; generic queries → rely on vector)
 
 ## Tech Stack
 
 ```
 packages/embeddings/
-  onnxruntime-node         # ONNX Runtime (npm, no external downloads)
-  all-MiniLM-L6-v2.onnx    # Bundled model file (~23MB quantized)
-  
+  @huggingface/transformers  # Auto-downloads ONNX model on first use (cached locally)
+  all-MiniLM-L6-v2            # 384-dim sentence transformer (ONNX, ~23MB)
+
 apps/server/
-  @lancedb/lancedb         # Embedded vector DB (Rust-based, runs in-process)
-  @dockit/embeddings       # Workspace dep (no external fetch)
+  @lancedb/lancedb            # Embedded vector DB (Rust native bindings)
+  @dockit/embeddings          # Workspace dep (no external fetch at runtime)
 ```
 
 ## Enterprise Compatibility
 
-- The embedding model is bundled in `packages/embeddings/model/` (no HuggingFace fetch at runtime)
-- `onnxruntime-node` ships native binaries for Linux x64/arm64, macOS x64/arm64, Windows x64
-- `@lancedb/lancedb` ships prebuilt native binaries for all platforms
-- `npm install` gets everything — zero external downloads at runtime
+- The embedding model downloads on first use via `@huggingface/transformers` (cached to `~/.cache/huggingface` or project-local `packages/embeddings/data/`)
+- For air-gapped environments: pre-download via `npm run download-model -w packages/embeddings`
+- `@lancedb/lancedb` ships prebuilt Rust native binaries for all platforms (linux x64/arm64, macOS x64/arm64, Windows x64/arm64)
+- `npm install` provides the embedding library; model loads lazily on first `embed()` call
 
 ## Implementation Steps
 
