@@ -5,8 +5,13 @@ import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import unzipper from 'unzipper';
-import asciidoctor from '@asciidoctor/core';
+import asciidoctorModule from '@asciidoctor/core';
 import type { AsciidocSourceConfig } from '../types.js';
+
+type Processor = {
+  convertFile(file: string, options?: Record<string, unknown>): unknown;
+};
+const asciidoctor = asciidoctorModule as unknown as () => Processor;
 
 const SKIP_DIRS = new Set([
   'node_modules', 'target', 'build', 'dist', '.git',
