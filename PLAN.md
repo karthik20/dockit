@@ -55,7 +55,7 @@ search:
 | | JSON Engine | Vector Engine (Hybrid) |
 |---|---|---|
 | **Library** | None (custom TF-IDF) | LanceDB embedded + `@dockit/embeddings` |
-| **Resource** | Minimal | ~400MB model + ~200MB RAM |
+**Resource** for Vector Engine: ~88 MB (embedding model) + ~32 MB/entry (LanceDB index) + ~200 MB RAM at runtime
 | **Build** | Extracts title/headings/snippet -> writes `index.json` | Chunks HTML by h1-h4 headings -> embeds via all-MiniLM-L6-v2 (cosine) + creates FTS index on searchText -> stores in LanceDB table per entry |
 | **Search** | TF-IDF scoring (title 10x, headings 3x, snippet 1x) | **Hybrid**: parallel vector (cosine ANN) + BM25 FTS -> deduplicated per-page -> RRF (Reciprocal Rank Fusion) with dynamic FTS weighting |
 | **Embed text** | N/A | `title (2x) + sectionHeading + sectionText` (up to 2000 chars) |
@@ -99,20 +99,90 @@ query: "quarkus in memory cache caffeine"
 
 ```
 packages/embeddings/
-  @huggingface/transformers  # Auto-downloads ONNX model on first use (cached locally)
-  all-MiniLM-L6-v2            # 384-dim sentence transformer (ONNX, ~23MB)
-
+  @huggingface/transformers  # Pipeline API for tokenization + ONNX inference across platforms
+  all-MiniLM-L6-v2            # 384-dim sentence transformer (~88 MB ONNX model + tokenizers/configs)
+  
 apps/server/
   @lancedb/lancedb            # Embedded vector DB (Rust native bindings)
   @dockit/embeddings          # Workspace dep (no external fetch at runtime)
 ```
 
+## Embedding Model Configuration
+
+`@huggingface/transformers` exposes a global `env` object at `@huggingface/transformers` for controlling model loading. The following options are relevant for bundling/offline use:
+
+| Option | Default | Purpose |
+|--------|---------|---------|
+| `env.cacheDir` | `./.cache/` | Directory where models are stored. Set to project-local path for bundling. |
+| `env.allowRemoteModels` | `true` | Set to `false` to prevent any HuggingFace CDN downloads (offline mode). |
+| `env.allowLocalModels` | `true` (Node.js) | Whether to check the local filesystem in `cacheDir`. |
+| `env.localModelPath` | `/models/` | Alternate local path to search for model files. |
+| `env.remoteHost` | `huggingface.co` | CDN host. Changeable for proxy/mirror environments. |
+| `env.useFSCache` | `true` (Node.js) | Whether to cache files to disk via `cacheDir`. |
+
+### Bundle mode (offline, enterprise-ready)
+
+```ts
+import { pipeline, env } from '@huggingface/transformers';
+
+// Point cacheDir to the bundled model directory
+env.cacheDir = path.join(__dirname, '..', 'model');   // packages/embeddings/model/
+env.allowRemoteModels = false;                          // block all CDN fetches
+
+const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+  dtype: 'q8',
+});
+```
+
+The model must be pre-populated in `cacheDir` following the HuggingFace Hub cache format:
+
+```
+<cacheDir>/
+  models--<org>--<model-name>/           # e.g., models--sentence-transformers--all-MiniLM-L6-v2
+    blobs/                                # Content-addressed: actual ONNX + config files
+      53aa5117...  (87 MB ONNX model)
+      58d4a9a4...  (11 KB README)
+      cb202bfe...  (456 KB tokenizer)
+      ...          (~500 KB total configs)
+    refs/
+      main          (file containing snapshot commit hash)
+    snapshots/
+      <commit-hash>/                     # Symlinks → ../../blobs/<hash>
+        config.json -> ../../blobs/<hash>
+        tokenizer.json -> ../../blobs/<hash>
+        model.safetensors -> ../../blobs/<hash>
+        ...
+```
+
+### Download mode (connected environments)
+
+The model can also be pre-seeded by running:
+
+```
+npm run download-model -w packages/embeddings
+```
+
+This calls `pipeline()` once (with `allowRemoteModels = true`), which downloads and caches the model to the configured `cacheDir`. After this, `allowRemoteModels` can be set to `false` for subsequent runs.
+
+### Proxy environment configuration
+
+If behind an HTTP proxy (common in enterprises), HuggingFace downloads respect standard proxy environment variables:
+
+```bash
+export HTTP_PROXY=http://proxy.corp:8080
+export HTTPS_PROXY=http://proxy.corp:8080
+```
+
+Or override the CDN host via `env.remoteHost` to point at an internal mirror.
+
 ## Enterprise Compatibility
 
-- The embedding model downloads on first use via `@huggingface/transformers` (cached to `~/.cache/huggingface` or project-local `packages/embeddings/data/`)
-- For air-gapped environments: pre-download via `npm run download-model -w packages/embeddings`
+### Embedding Model
+
+- **Bundled mode** (recommended for air-gapped): Set `env.cacheDir` to `packages/embeddings/model/` and `env.allowRemoteModels = false`. The 88 MB model (ONNX + tokenizers + configs) ships inside the npm tarball. Zero external fetches at runtime.
+- **Download mode**: Model downloads on first `embed()` call from HuggingFace CDN, cached to `env.cacheDir`. Respects `HTTP_PROXY`/`HTTPS_PROXY`.
+- **Pre-seed**: Run `npm run download-model -w packages/embeddings` once on a connected machine, then copy the `model/` directory to target machines.
 - `@lancedb/lancedb` ships prebuilt Rust native binaries for all platforms (linux x64/arm64, macOS x64/arm64, Windows x64/arm64)
-- `npm install` provides the embedding library; model loads lazily on first `embed()` call
 
 ## Implementation Steps
 
@@ -146,14 +216,18 @@ apps/server/
 - Returns `ISearchEngine` (JsonSearchEngine or VectorSearchEngine)
 
 ### Step 7a: Embeddings package (`packages/embeddings/`)
-- New workspace package with bundled ONNX model
-- Tokenizer + embed() function
-- Depends on `onnxruntime-node`
+- Workspace package wrapping `@huggingface/transformers`
+- `embed()` function: tokenize → ONNX inference → pooling → normalize → output 384-dim vectors
+- Model: `all-MiniLM-L6-v2` (88 MB, quantized q8)
+- Configurable via `env.cacheDir` and `env.allowRemoteModels` for offline/bundled use
+- Download script: `scripts/download-model.mjs` — pre-seeds model cache
 
 ### Step 7b: Vector search adapter (`infrastructure/search/vector/`)
-- `VectorSearchEngine` — LanceDB collections, per-entry
-- `EmbeddingService` — wraps `@dockit/embeddings`
-- Chunks documents, generates embeddings, stores in LanceDB
+- `VectorSearchEngine` — implements `ISearchEngine`, wraps LanceDB + `EmbeddingService`
+- `EmbeddingService` — lazy-loads `@dockit/embeddings`, caches pipeline in memory
+- **Build**: Chunks HTML by h1-h4 headings → embeds sections (2000 char max) → stores in LanceDB table + creates cosine vector index + FTS index on searchText column
+- **Search**: Hybrid — parallel vector cosine ANN + BM25 FTS → dedup per-path → RRF fusion with dynamic FTS weighting + title boost
+- LanceDB data stored in `data/.lancedb/<entryId>.lance/` per entry
 
 ### Step 8: Use cases (`core/usecases/`)
 - `SearchUseCase` — orchestrates search via injected ISearchEngine
