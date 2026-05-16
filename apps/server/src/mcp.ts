@@ -79,7 +79,7 @@ server.registerTool(
       required: ['entry', 'query'],
     }),
   },
-  async ({ entry, query, maxResults: limit }) => {
+  async ({ entry, query, maxResults: limit }: any) => {
     const entryStr = entry as string;
     const queryStr = query as string;
     const resultLimit = Math.min(Math.max(1, (limit as number) || maxResults), 20);
@@ -114,7 +114,7 @@ server.registerTool(
       required: ['entry', 'path'],
     }),
   },
-  async ({ entry, path: docPath }) => {
+  async ({ entry, path: docPath }: any) => {
     const entryStr = entry as string;
     const docPathStr = docPath as string;
 
@@ -155,7 +155,7 @@ server.registerTool(
       required: ['entry'],
     }),
   },
-  async ({ entry }) => {
+  async ({ entry }: any) => {
     const entryStr = entry as string;
 
     if (!entryStr) {
@@ -202,7 +202,7 @@ server.registerTool(
       required: ['entry'],
     }),
   },
-  async ({ entry }) => {
+  async ({ entry }: any) => {
     const entryStr = entry as string;
 
     if (!entryStr) {
@@ -244,7 +244,7 @@ server.registerTool(
       required: ['query'],
     }),
   },
-  async ({ query }) => {
+  async ({ query }: any) => {
     const queryStr = (query as string).toLowerCase();
     const db = getDb();
     const entries = db.prepare(
@@ -270,7 +270,7 @@ server.registerTool(
       required: ['query'],
     }),
   },
-  async ({ query, maxResults: limit }) => {
+  async ({ query, maxResults: limit }: any) => {
     const queryStr = query as string;
     const resultLimit = Math.min(Math.max(1, (limit as number) || maxResults * 2), 50);
 
