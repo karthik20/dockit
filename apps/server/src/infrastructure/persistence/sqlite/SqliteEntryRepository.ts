@@ -61,7 +61,21 @@ export class SqliteEntryRepository implements IEntryRepository {
   }
 
   async create(input: CreateEntryInput): Promise<Entry> {
-    const id = crypto.randomUUID();
+    // Resolve unique ID:
+    // - Use input.id if provided and available
+    // - Fall back to random UUID if no id given
+    // - If the provided id already exists, append -2, -3, etc.
+    let id = input.id ?? crypto.randomUUID();
+    if (input.id) {
+      let suffix = 2;
+      let candidateId = id;
+      while (this.db.prepare('SELECT 1 FROM entries WHERE id = ?').get(candidateId)) {
+        candidateId = `${id}-${suffix}`;
+        suffix++;
+      }
+      id = candidateId;
+    }
+
     const now = new Date().toISOString();
     this.db.prepare(
       'INSERT INTO entries (id, name, version, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'

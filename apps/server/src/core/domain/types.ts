@@ -71,6 +71,7 @@ export interface Build {
 }
 
 export interface CreateEntryInput {
+  id?: string;
   name: string;
   version: string;
   description?: string;
