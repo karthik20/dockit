@@ -184,6 +184,67 @@ Or override the CDN host via `env.remoteHost` to point at an internal mirror.
 - **Pre-seed**: Run `npm run download-model -w packages/embeddings` once on a connected machine, then copy the `model/` directory to target machines.
 - `@lancedb/lancedb` ships prebuilt Rust native binaries for all platforms (linux x64/arm64, macOS x64/arm64, Windows x64/arm64)
 
+## Pre-built Index Bundling
+
+Pre-built indexes can be bundled in the npm package for zero-network operation. This is distinct from runtime builds — indexes are frozen from a build machine and shipped alongside the code.
+
+### Storage Layout
+
+```
+packages/indexes/                     # @dockit/indexes workspace (future: separate package per entry)
+  package.json
+  entries.json                        # manifest: entry IDs, versions, build timestamps
+  quarkus/
+    index.json                        # JSON index (~300 KB)
+    .lancedb/quarkus.lance/           # LanceDB table (~32 MB)
+    bundle.tar.gz                     # HTML bundle (optional, for get_doc without build)
+  spring-boot/
+    ...                               # (same per entry)
+
+packages/embeddings/
+  model/                              # ONNX model cache (gitignored, included in npm tarball)
+    ...                               # HuggingFace Hub cache format
+  src/
+  package.json                        # "files": ["dist/", "model/", ...] ensures model is in tarball
+```
+
+### How it works
+
+```yaml
+# .gitignore excludes binary artifacts:
+packages/embeddings/model/
+
+# packages/embeddings/package.json includes them in npm:
+files: ["dist/", "model/", "scripts/", "src/"]
+```
+
+- **Git**: model/ and index binaries excluded (`.gitignore`)
+- **npm publish**: included via `package.json#files` — `npm install` in enterprise environments gets everything
+- **Runtime**: `EmbeddingService` calls `mod.configure()` which sets `env.cacheDir` to `packages/embeddings/model/`; model loads from local path with zero network
+- **Air-gapped setup**: `npm run download-model -w packages/embeddings` seeds the cache; `mod.configure({ offline: true })` blocks remote fetches
+
+### Freeze workflow
+
+```bash
+# On connected machine with git repo:
+npm install
+npm run download-model -w packages/embeddings    # seed model cache
+dockit build quarkus                              # build indexes
+dockit build spring-boot
+# ...
+npm publish                                       # everything bundled in tarball
+```
+
+### Per-entry sizes
+
+| Component | Size | Bundled? |
+|-----------|------|:--------:|
+| Embedding model (ONNX) | 88 MB | npm tarball |
+| LanceDB index per entry | ~32 MB | npm tarball or data dir |
+| JSON index per entry | ~300 KB | npm tarball |
+| HTML bundle per entry (gzipped) | ~5 MB | optional in tarball |
+| Source code | < 1 MB | git |
+
 ## Implementation Steps
 
 ### Step 1: Core domain (`core/domain/`)

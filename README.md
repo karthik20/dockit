@@ -1,6 +1,6 @@
 # Dockit
 
-Local documentation hub that aggregates multiple documentation source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown) into a unified, searchable HTML bundle — useful as LLM context.
+Local documentation hub that aggregates multiple documentation source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown) into a unified, searchable HTML bundle — useful as LLM context. Ships with two search engines: a lightweight **TF-IDF engine** and a **hybrid semantic+keyword engine** (LanceDB + all-MiniLM-L6-v2 embeddings) configurable via a single toggle.
 
 ## Quick Start
 
@@ -13,24 +13,65 @@ npm install
 # 2. Make CLI available globally
 npm link
 
-# 3. Start searching
-dockit search "react hooks"
+# 3. Build docs (one-time per entry)
+dockit build quarkus
+
+# 4. Start searching
 dockit search quarkus "configure cache"
 ```
 
-That's it. Quarkus, Quarkus Core, and React are pre-configured in `dockit.yaml`. Build docs on demand via CLI or MCP, and search immediately.
+That's it. Five entries are pre-configured in `dockit.yaml`. Entries start as `pending` — build one or more before searching.
 
 ## Pre-configured Documentation
 
-Dockit ships with three entries ready to build:
+Dockit ships with five entries ready to build:
 
-| Entry | Version | Source | Description |
-|-------|---------|--------|-------------|
-| **Quarkus** | 3.35 | GitHub AsciiDoc | Quarkus framework documentation |
+| Entry | Version | Source Type | Description |
+|-------|---------|-------------|-------------|
+| **Quarkus** | 3.35 | AsciiDoc | Quarkus framework documentation |
 | **Quarkus Core** | 3.35.2 | Maven Javadoc | Quarkus Core API reference |
 | **React** | 19 | GitHub Markdown | React library documentation |
+| **Spring Boot** | 3.5.x | Antora | Production-ready Spring applications |
+| **Spring Framework** | 7.x | Antora | Core Spring ecosystem reference |
 
 Add your own entries by editing `dockit.yaml` — see [Supported Sources](#supported-documentation-sources) below.
+
+## Search Engine
+
+Dockit ships two search engines toggleable via `dockit.yaml`:
+
+```yaml
+search:
+  engine: vector    # 'vector' (default) | 'json' (TF-IDF fallback)
+```
+
+| | JSON (TF-IDF) | Vector (Hybrid) |
+|---|---|---|
+| **Storage per entry** | ~300 KB | ~32 MB (LanceDB) |
+| **Runtime memory** | Minimal | ~200 MB |
+| **Build time** | Fast | Slower (embeds docs via ONNX) |
+| **Search method** | Term-frequency scoring (title 10x, headings 3x, body 1x) | Hybrid: parallel cosine ANN + BM25 FTS → RRF fusion |
+| **Keyword precision** | High (exact term matches) | Very high (FTS component recovers keywords) |
+| **Semantic matching** | None | Yes (finds conceptually related docs even without exact terms) |
+| **Model** | None | `all-MiniLM-L6-v2` via `@huggingface/transformers` (~88 MB ONNX) |
+| **Works offline** | Yes — zero dependencies | Yes — model bundles in npm package |
+
+### How hybrid search works
+
+```
+query → vector (cosine ANN) + BM25 (FTS) in parallel
+         → deduplicate per-path → RRF fusion → top N
+```
+
+- Vector search finds semantically related pages (e.g., "Ahead-of-Time Caching" for a cache query)
+- FTS recovers exact keyword matches (e.g., "caffeine" in the Caching guide)
+- Reciprocal Rank Fusion combines both with dynamic weighting: confident FTS gets 2x weight, uncertain FTS gets 0.7x
+- Title matches in FTS results get an additional 1.5x boost
+
+### When to use each
+
+- **`json`**: Low-resource environments, fast builds, or when exact keyword matching is sufficient
+- **`vector`** (default): Better discovery of non-obvious matches, section-level chunking with heading context in results, hybrid search that matches both keywords and concepts
 
 ## CLI Usage (Recommended)
 
@@ -182,7 +223,11 @@ The LLM strips conversational filler from queries, scopes searches to the right 
 
 ## Offline / Proxy Mode
 
-For environments behind corporate proxies or without internet access, use local alternatives to remote URLs. Each source type supports local paths that take precedence over URLs:
+For environments behind corporate proxies or without internet access, Dockit supports multiple fallback mechanisms:
+
+### Source Repositories (local clones)
+
+Each source type supports local paths that take precedence over remote URLs:
 
 ```yaml
 # dockit.yaml — local mode entries
@@ -193,26 +238,75 @@ entries:
     sources:
       - type: asciidoc
         label: "Quarkus Docs"
-        localPath: "/home/user/repos/quarkus"        # pre-cloned repo
+        localPath: "/home/user/repos/quarkus"
         sourcePath: "docs/src/main/asciidoc"
-
-  - id: quarkus-mvn
-    name: Quarkus Core (Maven CLI)
-    version: "3.35.2"
-    sources:
-      - type: maven
-        label: "Quarkus Core Javadoc"
-        groupId: "io.quarkus"
-        artifactId: "quarkus-core"
-        version: "3.35.2"
-        useMavenCommand: true    # resolves via ~/.m2/settings.xml
 ```
 
-**Maven `useMavenCommand`** spawns `mvn org.apache.maven.plugins:maven-dependency-plugin:3.10.0:copy`, respecting your local `~/.m2/settings.xml` (proxies, mirrors, private repos). Requires Maven installed and in `PATH`.
+### Embedding Model (air-gapped vector search)
 
-**GitHub Markdown** clones the repository (shallow, depth 1), scans for `.md` files, strips YAML frontmatter, and converts to styled HTML using `marked`. The `sourcePath` field limits scanning to a subdirectory (e.g. `src/content` for React docs).
+The embedding model downloads on first `embed()` call by default. For air-gapped environments:
 
-**`localPath`** fields are validated at build time (not config sync), so files can be mounted later (e.g., Docker volumes).
+**Option A — Pre-seed on connected machine, then copy:**
+```bash
+# On connected machine
+npm run download-model -w packages/embeddings
+
+# Copy the model/ directory to the target machine
+# Then call configure({ offline: true }) before first search
+```
+
+**Option B — Bundle in npm package (enterprise proxy):**
+```ts
+import { configure } from '@dockit/embeddings';
+
+// Before first embed() call:
+configure({ cacheDir: '/path/to/model', offline: true });
+```
+
+The model directory (`packages/embeddings/model/`) is excluded from git via `.gitignore` but is included in the npm tarball via the `files` field in `package.json`. This means `npm install` in an enterprise environment that uses a private npm registry gets the model automatically.
+
+### Pre-built Index Bundling
+
+For environments where even building is impractical, LanceDB and JSON indexes can be pre-built and bundled:
+
+1. Build indexes on a connected machine:
+   ```bash
+   dockit build quarkus
+   dockit build spring-boot
+   # ... all desired entries
+   ```
+2. Package the `data/` directory (or specific `.lancedb/` + `index.json` files)
+3. Deploy to target machines via the same `data/` path
+
+### Proxy Configuration
+
+Standard proxy environment variables:
+
+```bash
+export HTTP_PROXY=http://proxy.corp:8080
+export HTTPS_PROXY=http://proxy.corp:8080
+```
+
+Or override the HuggingFace CDN host via code:
+
+```ts
+import { env } from '@huggingface/transformers';
+env.remoteHost = 'https://internal-mirror.corp';  // point to internal mirror
+```
+
+### Native Binaries
+
+`@lancedb/lancedb` ships prebuilt binaries for linux x64/arm64, macOS x64/arm64, and Windows x64/arm64 — no compilation needed.
+
+### Additional offline fields
+
+| Source Type | Fields (all take precedence over remote) |
+|-------------|------------------------------------------|
+| **ZIP** | `localPath` — path to pre-downloaded .zip |
+| **Maven** | `useMavenCommand: true` — uses local `~/.m2/settings.xml` (proxies, mirrors); `localJar` — pre-downloaded .jar |
+| **Antora** | `localPath` — pre-cloned repo |
+| **AsciiDoc** | `localPath` — pre-cloned repo (kept, not cleaned up) |
+| **GitHub Markdown** | `localPath` — pre-cloned repo |
 
 ## Web UI (Optional)
 
@@ -245,7 +339,9 @@ dockit/
 │   ├── server/          Express + TypeScript backend (port 3001)
 │   └── client/          React + Vite + Tailwind CSS frontend (port 5173)
 ├── bin/                 CLI entry point and commands
-├── data/                Runtime data (SQLite DB, extracted sources, HTML bundles)
+├── packages/
+│   └── embeddings/      @dockit/embeddings — ONNX model wrapper (@huggingface/transformers)
+├── data/                Runtime data (SQLite DB, extracted sources, HTML bundles, LanceDB indexes)
 ├── dockit.yaml          Entries/sources config
 ├── SKILL.md             LLM skill instructions
 ├── PLAN.md              Full architecture document
@@ -284,3 +380,4 @@ dockit/
 | Archives | unzipper |
 | Build Pipeline | Antora CLI, Git, Maven dependency plugin |
 | Markdown | marked |
+| Vector Search | LanceDB embedded (Rust native), all-MiniLM-L6-v2 via @huggingface/transformers |
