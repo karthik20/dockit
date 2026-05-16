@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { IBuildRepository } from '../../core/ports/IBuildRepository.js';
 import type { ISourceRepository } from '../../core/ports/ISourceRepository.js';
+import type { IEntryRepository } from '../../core/ports/IEntryRepository.js';
 import type { ISearchEngine } from '../../core/ports/ISearchEngine.js';
 import type { Source, HtmlFile } from '../../core/domain/types.js';
 import type { ZipSourceConfig, AntoraSourceConfig, MavenSourceConfig, AsciidocSourceConfig, GithubMarkdownSourceConfig } from '../../core/domain/types.js';
@@ -23,6 +24,7 @@ export class BuildUseCase {
   constructor(
     private readonly buildRepo: IBuildRepository,
     private readonly sourceRepo: ISourceRepository,
+    private readonly entryRepo: IEntryRepository,
     private readonly searchEngine: ISearchEngine,
   ) {}
 
@@ -30,6 +32,7 @@ export class BuildUseCase {
     const sources = await this.sourceRepo.findByEntryId(entryId);
     if (sources.length === 0) throw new Error('Entry has no sources');
 
+    await this.entryRepo.updateStatus(entryId, 'building');
     const build = await this.buildRepo.create(entryId);
     const logLines: string[] = [];
     const log = (msg: string) => logLines.push(`[${new Date().toISOString()}] ${msg}`);
@@ -70,11 +73,13 @@ export class BuildUseCase {
 
       const fullLog = logLines.join('\n');
       await this.buildRepo.update(build.id, 'ready', fullLog);
+      await this.entryRepo.updateStatus(entryId, 'ready');
 
       return { buildId: build.id, entryId, status: 'ready', log: fullLog };
     } catch (err) {
       const fullLog = logLines.join('\n');
       await this.buildRepo.update(build.id, 'error', fullLog);
+      await this.entryRepo.updateStatus(entryId, 'error');
       return { buildId: build.id, entryId, status: 'error', log: fullLog };
     }
   }

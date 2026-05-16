@@ -110,15 +110,20 @@ export function syncConfigToDb(config: DockitConfig): string[] {
   const entryIds: string[] = [];
 
   for (const entryConfig of config.entries) {
+    // Preserve existing status if entry already exists
+    const existing = db.prepare('SELECT status FROM entries WHERE id = ?').get(entryConfig.id) as { status: string } | undefined;
+    const status = existing?.status || 'pending';
+
     db.prepare(`
       INSERT OR REPLACE INTO entries (id, name, version, description, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM entries WHERE id = ?), datetime('now')), datetime('now'))
     `).run(
       entryConfig.id,
       entryConfig.name,
       entryConfig.version,
       entryConfig.description || '',
-      'pending'
+      status,
+      entryConfig.id
     );
 
     entryIds.push(entryConfig.id);
@@ -127,10 +132,14 @@ export function syncConfigToDb(config: DockitConfig): string[] {
       const config = buildSourceConfig(sourceConfig);
       const sourceId = `${entryConfig.id}-src-${sourceConfig.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
 
+      // Preserve existing source status if it already exists
+      const existingSource = db.prepare('SELECT status FROM sources WHERE id = ?').get(sourceId) as { status: string } | undefined;
+      const sourceStatus = existingSource?.status || 'pending';
+
       db.prepare(`
         INSERT OR REPLACE INTO sources (id, entry_id, type, label, config, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(sourceId, entryConfig.id, sourceConfig.type, sourceConfig.label, JSON.stringify(config), 'pending');
+        VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM sources WHERE id = ?), datetime('now')))
+      `).run(sourceId, entryConfig.id, sourceConfig.type, sourceConfig.label, JSON.stringify(config), sourceStatus, sourceId);
     }
   }
 

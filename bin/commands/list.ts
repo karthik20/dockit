@@ -4,23 +4,28 @@ import { formatTable } from '../utils.js';
 export default async function list(root, positional, flags) {
   const asJson = !!flags.json;
 
-  const { getDb } = await import(path.join(root, 'apps/server/src/db/index.js'));
-  const { getSources } = await import(path.join(root, 'apps/server/src/db/index.js'));
+  const { getDb } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/connection.js'));
+  const { SqliteEntryRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteEntryRepository.js'));
+  const { SqliteSourceRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteSourceRepository.js'));
 
   const db = getDb();
-  const entries = db.prepare('SELECT id, name, version, description, status FROM entries ORDER BY name').all();
+  const entryRepo = new SqliteEntryRepository(db);
+  const sourceRepo = new SqliteSourceRepository(db);
 
-  const output = entries.map((e) => {
-    const sources = getSources(e.id);
-    return {
+  const entries = await entryRepo.findAll();
+
+  const output = [];
+  for (const e of entries) {
+    const sources = await sourceRepo.findByEntryId(e.id);
+    output.push({
       id: e.id,
       name: e.name,
       version: e.version,
       description: e.description,
       status: e.status,
       sourceCount: sources.length,
-    };
-  });
+    });
+  }
 
   if (asJson) {
     console.log(JSON.stringify(output, null, 2));

@@ -92,7 +92,7 @@ entries:
   #       sourcePath: "src/content"
 
 search:
-  engine: json  # 'json' (default, low-resource) | 'vector' (requires @lancedb/lancedb + @dockit/embeddings)
+  engine: vector  # 'vector' (default, semantic search) | 'json' (fallback, low-resource)
 
 mcp:
   toolPrefix: "dockit_"
