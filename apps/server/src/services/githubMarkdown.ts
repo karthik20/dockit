@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { marked } from 'marked';
-import type { GithubMarkdownSourceConfig } from '../types.js';
+import type { GithubMarkdownSourceConfig } from '../core/domain/types.js';
 
 const SKIP_DIRS = new Set([
   'node_modules', 'target', 'build', 'dist', '.git',

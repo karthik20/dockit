@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import type { BuildUseCase } from '../core/usecases/BuildUseCase.js';
 import type { ConfigUseCase } from '../core/usecases/ConfigUseCase.js';
+import type { IBuildRepository } from '../core/ports/IBuildRepository.js';
 import type { Source, ZipSourceConfig, MavenSourceConfig, AntoraSourceConfig, AsciidocSourceConfig } from '../core/domain/types.js';
 
-export function createBuildRoutes(buildUseCase: BuildUseCase, configUseCase: ConfigUseCase): Router {
+export function createBuildRoutes(buildUseCase: BuildUseCase, configUseCase: ConfigUseCase, buildRepo: IBuildRepository): Router {
   const router = Router();
 
   router.post('/entries/:id/build', async (req: Request, res: Response) => {
@@ -29,10 +30,7 @@ export function createBuildRoutes(buildUseCase: BuildUseCase, configUseCase: Con
 
   router.get('/entries/:id/build-status', async (req: Request, res: Response) => {
     const entryId = req.params.id as string;
-    const db = (await import('../infrastructure/persistence/sqlite/connection.js')).getDb();
-    const build = db.prepare(
-      'SELECT * FROM builds WHERE entry_id = ? ORDER BY started_at DESC LIMIT 1'
-    ).get(entryId) as { status: string; log: string; started_at: string; finished_at: string } | undefined;
+    const build = await buildRepo.findLatest(entryId);
     if (!build) {
       res.json({ status: 'none', log: '' });
       return;

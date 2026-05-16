@@ -4,7 +4,7 @@ import { execSync, spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import unzipper from 'unzipper';
-import type { AntoraSourceConfig } from '../types.js';
+import type { AntoraSourceConfig } from '../core/domain/types.js';
 
 async function cloneRepo(repoUrl: string, targetDir: string, log: (msg: string) => void): Promise<void> {
   log(`Cloning repository ${repoUrl}`);

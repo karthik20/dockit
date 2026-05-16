@@ -2,9 +2,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { parse } from 'node-html-parser';
 import type { ISearchEngine } from '../../../core/ports/ISearchEngine.js';
+import type { IEntryReadModel } from '../../../core/ports/IEntryReadModel.js';
 import type { SearchResult, GlobalSearchResult, HtmlFile } from '../../../core/domain/types.js';
 import { DATA_ROOT } from '../../../services/paths.js';
-import { getDb } from '../../persistence/sqlite/connection.js';
 
 const STOP_WORDS = new Set([
   'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -36,6 +36,8 @@ function countOccurrences(text: string, term: string): number {
 
 export class JsonSearchEngine implements ISearchEngine {
   readonly capability = 'json' as const;
+
+  constructor(private readonly entryReadModel: IEntryReadModel) {}
 
   async buildIndex(entryId: string, htmlFiles: HtmlFile[], log: (msg: string) => void): Promise<void> {
     log(`Building search index for ${htmlFiles.length} files`);
@@ -88,10 +90,7 @@ export class JsonSearchEngine implements ISearchEngine {
   }
 
   async globalSearch(query: string, limit = 30): Promise<GlobalSearchResult[]> {
-    const db = getDb();
-    const readyEntries = db.prepare(
-      "SELECT id, name, version FROM entries WHERE status = 'ready' ORDER BY name"
-    ).all() as { id: string; name: string; version: string }[];
+    const readyEntries = await this.entryReadModel.listReadyEntries();
 
     const allResults: GlobalSearchResult[] = [];
     for (const entry of readyEntries) {

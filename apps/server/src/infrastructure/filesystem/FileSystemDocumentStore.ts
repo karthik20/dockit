@@ -5,15 +5,23 @@ import { DATA_ROOT } from '../../services/paths.js';
 
 export class FileSystemDocumentStore implements IDocumentStore {
   async getDocument(entryId: string, docPath: string): Promise<string> {
-    const filePath = path.join(DATA_ROOT, entryId, 'bundle', docPath);
-    if (!fs.existsSync(filePath)) {
+    const resolved = path.resolve(DATA_ROOT, entryId, 'bundle', docPath);
+    const dataRoot = path.resolve(DATA_ROOT);
+    if (!resolved.startsWith(dataRoot)) {
+      throw new Error('Invalid document path');
+    }
+    if (!fs.existsSync(resolved)) {
       throw new Error(`Document not found: ${docPath} for entry ${entryId}`);
     }
-    return fs.readFileSync(filePath, 'utf-8');
+    return fs.readFileSync(resolved, 'utf-8');
   }
 
   async documentExists(entryId: string, docPath: string): Promise<boolean> {
-    const filePath = path.join(DATA_ROOT, entryId, 'bundle', docPath);
-    return fs.existsSync(filePath);
+    const resolved = path.resolve(DATA_ROOT, entryId, 'bundle', docPath);
+    const dataRoot = path.resolve(DATA_ROOT);
+    if (!resolved.startsWith(dataRoot)) {
+      return false;
+    }
+    return fs.existsSync(resolved);
   }
 }

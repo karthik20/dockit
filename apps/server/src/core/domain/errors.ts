@@ -13,7 +13,7 @@ export class NotFoundError extends DomainError {
 }
 
 export class ValidationError extends DomainError {
-  constructor(message: string) {
+  constructor(message: string, public readonly field?: string, public readonly value?: unknown) {
     super(message, 'VALIDATION_ERROR');
     this.name = 'ValidationError';
   }

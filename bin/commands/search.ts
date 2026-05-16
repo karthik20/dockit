@@ -29,6 +29,7 @@ export default async function search(root, positional, flags) {
   const { SqliteEntryRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteEntryRepository.js'));
   const { SqliteSourceRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteSourceRepository.js'));
   const { SqliteBuildRepository } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteBuildRepository.js'));
+  const { SqliteEntryReadModel } = await import(path.join(root, 'apps/server/src/infrastructure/persistence/sqlite/SqliteEntryReadModel.js'));
   const { createSearchEngine } = await import(path.join(root, 'apps/server/src/infrastructure/search/SearchEngineFactory.js'));
   const { SearchUseCase } = await import(path.join(root, 'apps/server/src/core/usecases/SearchUseCase.js'));
   const { loadConfig, syncConfigToDb } = await import(path.join(root, 'apps/server/src/services/configLoader.js'));
@@ -41,10 +42,13 @@ export default async function search(root, positional, flags) {
   // Sync config to DB
   const configPath = path.join(root, 'dockit.yaml');
   const config = loadConfig(configPath);
-  syncConfigToDb(config);
 
   const entryRepo = new SqliteEntryRepository(db);
-  const searchEngine = await createSearchEngine(config.search?.engine);
+  const sourceRepo = new SqliteSourceRepository(db);
+  await syncConfigToDb(config, entryRepo, sourceRepo);
+
+  const entryReadModel = new SqliteEntryReadModel(db);
+  const searchEngine = await createSearchEngine(entryReadModel, config.search?.engine);
   const searchUseCase = new SearchUseCase(searchEngine);
 
   let results: any[] = [];

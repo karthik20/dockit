@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import unzipper from 'unzipper';
-import type { ZipSourceConfig } from '../types.js';
+import type { ZipSourceConfig } from '../core/domain/types.js';
 
 export async function extractLocalZip(
   localPath: string,

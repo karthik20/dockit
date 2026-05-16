@@ -1,8 +1,8 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { load as loadYaml } from 'js-yaml';
-import { getDb } from '../db/index.js';
-import type { SourceType, SourceConfig } from '../types.js';
+import type { IEntryRepository } from '../core/ports/IEntryRepository.js';
+import type { ISourceRepository } from '../core/ports/ISourceRepository.js';
+import type { SourceType, SourceConfig } from '../core/domain/types.js';
 
 export interface DockitSourceConfig {
   type: SourceType;
@@ -105,26 +105,24 @@ function validateSourceConfig(source: DockitSourceConfig): void {
   }
 }
 
-export function syncConfigToDb(config: DockitConfig): string[] {
-  const db = getDb();
+export async function syncConfigToDb(config: DockitConfig, entryRepo: IEntryRepository, sourceRepo: ISourceRepository): Promise<string[]> {
   const entryIds: string[] = [];
 
   for (const entryConfig of config.entries) {
     // Preserve existing status if entry already exists
-    const existing = db.prepare('SELECT status FROM entries WHERE id = ?').get(entryConfig.id) as { status: string } | undefined;
-    const status = existing?.status || 'pending';
+    const existing = await entryRepo.findById(entryConfig.id);
+    const now = new Date().toISOString();
+    const created_at = existing?.created_at ?? now;
 
-    db.prepare(`
-      INSERT OR REPLACE INTO entries (id, name, version, description, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM entries WHERE id = ?), datetime('now')), datetime('now'))
-    `).run(
-      entryConfig.id,
-      entryConfig.name,
-      entryConfig.version,
-      entryConfig.description || '',
-      status,
-      entryConfig.id
-    );
+    await entryRepo.save({
+      id: entryConfig.id,
+      name: entryConfig.name,
+      version: entryConfig.version,
+      description: entryConfig.description || '',
+      status: existing?.status ?? 'pending',
+      created_at,
+      updated_at: now,
+    });
 
     entryIds.push(entryConfig.id);
 
@@ -133,13 +131,17 @@ export function syncConfigToDb(config: DockitConfig): string[] {
       const sourceId = `${entryConfig.id}-src-${sourceConfig.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
 
       // Preserve existing source status if it already exists
-      const existingSource = db.prepare('SELECT status FROM sources WHERE id = ?').get(sourceId) as { status: string } | undefined;
-      const sourceStatus = existingSource?.status || 'pending';
+      const existingSource = await sourceRepo.findById(sourceId);
 
-      db.prepare(`
-        INSERT OR REPLACE INTO sources (id, entry_id, type, label, config, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM sources WHERE id = ?), datetime('now')))
-      `).run(sourceId, entryConfig.id, sourceConfig.type, sourceConfig.label, JSON.stringify(config), sourceStatus, sourceId);
+      await sourceRepo.save({
+        id: sourceId,
+        entry_id: entryConfig.id,
+        type: sourceConfig.type,
+        label: sourceConfig.label,
+        config,
+        status: existingSource?.status ?? 'pending',
+        created_at: existingSource?.created_at ?? now,
+      });
     }
   }
 
