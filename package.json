@@ -1,6 +1,6 @@
 {
-  "name": "dockit",
-  "version": "1.0.0",
+  "name": "@lon-ask/dockit",
+  "version": "0.1.0",
   "description": "Local documentation hub — normalize multiple doc sources into a unified searchable bundle",
   "type": "module",
   "bin": {
