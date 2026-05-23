@@ -1,6 +1,7 @@
 {
   "name": "@lon-ask/dockit",
   "version": "0.1.2",
+  "license": "MIT",
   "description": "Local documentation hub — normalize multiple doc sources into a unified searchable bundle",
   "type": "module",
   "bin": {
