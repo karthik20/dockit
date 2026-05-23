@@ -6,38 +6,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  publish-embeddings:
+  publish-monorepo:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write 
+
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          
       - run: npm ci
+
       - name: Set version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           TAG=$(echo "${{ github.ref }}" | sed 's|refs/tags/v||')
+          # Updates both workspaces natively in the single unified environment
           npm version "$TAG" --no-git-tag-version --allow-same-version -w packages/embeddings
+          npm version "$TAG" --no-git-tag-version --allow-same-version
+
+      # Phase 1: Compile and Deploy the inner workspace package
       - run: npm run build -w packages/embeddings
       - run: npm publish -w packages/embeddings --access public
         env:
           NODE_AUTH_TOKEN: ""
 
-  publish-dockit:
-    needs: publish-embeddings
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - run: npm ci
-      - name: Set version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG=$(echo "${{ github.ref }}" | sed 's|refs/tags/v||')
-          npm version "$TAG" --no-git-tag-version --allow-same-version
+      # FIXED ERROR 2: Phase 2 now runs in the exact same workspace with compiled files active
       - run: npm run build
       - run: npm publish --access public
         env:
