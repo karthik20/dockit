@@ -1,6 +1,6 @@
 import { pipeline, env } from '@huggingface/transformers';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 
 const MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
 
@@ -28,13 +28,10 @@ export function configure(options?: { cacheDir?: string; offline?: boolean }): v
     env.allowRemoteModels = false;
   }
 
-  // In bundled mode, use the package-local model/ directory
+  // Default to dockit home directory for model cache
   if (!options?.cacheDir) {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    // __dirname is <package>/dist/ when built, or <package>/src/ during dev
-    // The model/ directory is sibling to dist/ and src/
-    const pkgRoot = path.resolve(__dirname, '..');
-    env.cacheDir = path.join(pkgRoot, 'model');
+    const dataDir = process.env.DOCKIT_DATA_DIR || path.join(os.homedir(), '.dockit');
+    env.cacheDir = path.join(dataDir, 'models');
   }
 
   // Use filesystem cache even in browser-like envs

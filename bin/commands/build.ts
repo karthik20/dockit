@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { resolveConfigPath } from '../utils.js';
 
 export default async function build(root, positional, flags) {
   const entryId = positional[0];
@@ -34,7 +35,7 @@ export default async function build(root, positional, flags) {
   const buildRepo = new SqliteBuildRepository(db);
 
   // Sync config to DB
-  const configPath = path.join(root, 'dockit.yaml');
+  const configPath = resolveConfigPath(root);
   const config = loadConfig(configPath);
   syncConfigToDb(config, entryRepo, sourceRepo);
   const entryReadModel = new SqliteEntryReadModel(db);

@@ -4,6 +4,8 @@ Local documentation hub that aggregates multiple documentation source types (ZIP
 
 Ships with two search engines: a lightweight **TF-IDF engine** and a **hybrid semantic+keyword engine** (LanceDB + all-MiniLM-L6-v2 embeddings) configurable via a single toggle.
 
+All operational data (SQLite DB, build outputs, search indexes, knowledge graphs, embeddings model cache) is stored in `~/.dockit/` by default. Override with the `DOCKIT_DATA_DIR` environment variable.
+
 ## Quick Start
 
 ```bash
@@ -320,26 +322,18 @@ entries:
 
 ### Embedding Model (air-gapped vector search)
 
-The embedding model downloads on first `embed()` call by default. For air-gapped environments:
+The embedding model downloads on first `embed()` call by default into `~/.dockit/models/`. Override with `DOCKIT_DATA_DIR` or `configure({ cacheDir: '...' })`. For air-gapped environments:
 
 **Option A — Pre-seed on connected machine, then copy:**
 ```bash
 # On connected machine
 npm run download-model -w packages/embeddings
 
-# Copy the model/ directory to the target machine
-# Then call configure({ offline: true }) before first search
+# Copy ~/.dockit/models/ to the target machine
 ```
 
-**Option B — Bundle in npm package (enterprise proxy):**
-```ts
-import { configure } from '@dockit/embeddings';
-
-// Before first embed() call:
-configure({ cacheDir: '/path/to/model', offline: true });
-```
-
-The model directory (`packages/embeddings/model/`) is excluded from git via `.gitignore` but is included in the npm tarball via the `files` field in `package.json`. This means `npm install` in an enterprise environment that uses a private npm registry gets the model automatically.
+**Option B — Install offline via npm:**
+The model ONNX bundle ships inside the `@dockit/embeddings` npm package under `packages/embeddings/model/`. If `~/.dockit/models/` is empty at first `embed()` call, it will attempt to download — set `DOCKIT_DATA_DIR` to point to a pre-seeded directory or use `configure({ cacheDir: '/path/to/model' })`.
 
 ### Pre-built Index Bundling
 
@@ -351,8 +345,8 @@ For environments where even building is impractical, LanceDB and JSON indexes ca
    dockit build spring-boot
    # ... all desired entries
    ```
-2. Package the `data/` directory (or specific `.lancedb/` + `index.json` files)
-3. Deploy to target machines via the same `data/` path
+2. Package the `~/.dockit/` directory (or specific `.lancedb/` + `index.json` files)
+3. Deploy to target machines via the same `~/.dockit/` path
 
 ### Proxy Configuration
 
@@ -409,6 +403,30 @@ dockit dev
 - **Build Now** — server-side processing with live log output
 - **Download Script** — exports a self-contained `.sh` script with all curl commands
 
+## Data Storage
+
+All runtime data is stored in `~/.dockit/` by default:
+
+| Path | Description |
+|------|-------------|
+| `~/.dockit/dockit.db` | SQLite database (entries, sources, builds) |
+| `~/.dockit/dockit.yaml` | User configuration (auto-created by `dockit init`) |
+| `~/.dockit/.lancedb/` | Vector search index (LanceDB) |
+| `~/.dockit/models/` | HuggingFace ONNX embedding model cache |
+| `~/.dockit/{entryId}/bundle/` | Built HTML documentation per entry |
+| `~/.dockit/{entryId}/sources/` | Raw source processing artifacts |
+| `~/.dockit/{entryId}/graph.json` | Knowledge graph (source-code entries) |
+
+Override with the environment variable:
+
+```bash
+export DOCKIT_DATA_DIR=/custom/path   # all data goes here instead of ~/.dockit/
+```
+
+Configuration (`dockit.yaml`) is resolved in order:
+1. `~/.dockit/dockit.yaml` (user home, persisted by `dockit init`)
+2. Project root `dockit.yaml` (backward compatibility for development)
+
 ## Architecture
 
 ```
@@ -426,7 +444,14 @@ dockit/
 ├── bin/                 CLI entry point, graph commands, init command
 ├── packages/
 │   └── embeddings/      @dockit/embeddings — ONNX model wrapper (@huggingface/transformers)
-├── data/                Runtime data (SQLite DB, extracted sources, HTML bundles, LanceDB indexes, graph.json)
+├── ~/.dockit/            Runtime data (created automatically on first run)
+│   ├── dockit.db              SQLite database
+│   ├── dockit.yaml            Entries/sources config (auto-created by `dockit init`)
+│   ├── .lancedb/              Vector search index
+│   ├── models/                HuggingFace ONNX embedding model cache
+│   ├── {entryId}/bundle/      Build outputs per entry
+│   ├── {entryId}/sources/     Raw source processing artifacts
+│   └── {entryId}/graph.json   Knowledge graph (source-code entries)
 ├── dockit.yaml          Entries/sources config
 ├── SKILL.md             LLM skill instructions
 ├── GRAPHIFY_SOURCE_PLAN.md  Graphify feature plan

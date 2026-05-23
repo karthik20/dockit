@@ -24,9 +24,7 @@ import { PathResolver } from './infrastructure/source-processors/PathResolver.js
 import { GraphifyKnowledgeGraph } from './infrastructure/graph/GraphifyKnowledgeGraph.js';
 import { DATA_ROOT } from './services/paths.js';
 
-const PROJECT_ROOT = path.resolve(DATA_ROOT, '..', '..');
-
-let configPath = path.join(PROJECT_ROOT, 'dockit.yaml');
+let configPath = path.join(DATA_ROOT, 'dockit.yaml');
 if (!fs.existsSync(configPath)) {
   configPath = path.join(process.cwd(), 'dockit.yaml');
 }

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,18 @@ export function resolveProjectRoot() {
     dir = path.dirname(dir);
   }
   throw new Error('Could not find dockit project root');
+}
+
+export function resolveDockitHome(): string {
+  return process.env.DOCKIT_DATA_DIR || path.join(os.homedir(), '.dockit');
+}
+
+export function resolveConfigPath(root: string): string {
+  const homeConfig = path.join(resolveDockitHome(), 'dockit.yaml');
+  if (fs.existsSync(homeConfig)) return homeConfig;
+  const projectConfig = path.join(root, 'dockit.yaml');
+  if (fs.existsSync(projectConfig)) return projectConfig;
+  return homeConfig;
 }
 
 export function parseArgs(argv) {

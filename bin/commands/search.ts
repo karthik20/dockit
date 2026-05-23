@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { resolveConfigPath } from '../utils.js';
 
 export default async function search(root, positional, flags) {
   let entryId = flags.entry || null;
@@ -40,7 +41,7 @@ export default async function search(root, positional, flags) {
   const db = getDb();
 
   // Sync config to DB
-  const configPath = path.join(root, 'dockit.yaml');
+  const configPath = resolveConfigPath(root);
   const config = loadConfig(configPath);
 
   const entryRepo = new SqliteEntryRepository(db);

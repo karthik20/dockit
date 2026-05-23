@@ -1,6 +1,4 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-export const DATA_ROOT = path.resolve(__dirname, '..', '..', '..', '..', 'data');
+export const DATA_ROOT = process.env.DOCKIT_DATA_DIR || path.join(os.homedir(), '.dockit');
