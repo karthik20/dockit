@@ -18,6 +18,7 @@ const commands = {
   status: () => import('./commands/status.js'),
   get: () => import('./commands/get.js'),
   graph: () => import('./commands/graph.js'),
+  init: () => import('./commands/init.js'),
 };
 
 if (command && commands[command]) {
@@ -68,6 +69,11 @@ Commands:
     --json                Output as JSON
   graph explain <entry> <node>  Show node details and connections
     --json                Output as JSON
+  init [--path <dir>] [--name <name>]  Initialize a project as a dockit source
+    --path <dir>          Path to source directory (default: .)
+    --name <name>         Entry name (default: directory name)
+    --version <ver>       Version string (default: 1.0)
+    --code-path <path>    Subdirectory for source code scanning (optional)
 
 Examples:
   dockit search react "how to create a hook"
