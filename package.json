@@ -1,11 +1,21 @@
 {
   "name": "dockit",
   "version": "1.0.0",
-  "private": true,
   "description": "Local documentation hub — normalize multiple doc sources into a unified searchable bundle",
   "type": "module",
   "bin": {
     "dockit": "./bin/dockit.js"
+  },
+  "files": [
+    "bin/",
+    "apps/server/src/",
+    "apps/client/dist/",
+    "dockit.yaml",
+    "SKILL.md",
+    "scripts/mcp-wrapper.sh"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "workspaces": [
     "apps/server",
@@ -18,19 +28,33 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build:server": "npm run build -w apps/server",
     "build:client": "npm run build -w apps/client",
-    "build": "npm run build:server && npm run build:client"
+    "build": "npm run build:server && npm run build:client",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/server": "^2.0.0-alpha.2",
+    "better-sqlite3": "^12.9.0",
+    "js-yaml": "^4.1.1",
+    "tsx": "^4.19.2",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "@asciidoctor/core": "^2.2.9",
+    "@antora/cli": "^3.1.14",
+    "@antora/site-generator": "^3.2.0-alpha.11",
+    "node-html-parser": "^6.1.13",
+    "marked": "^18.0.3",
+    "unzipper": "^0.12.3",
+    "uuid": "^11.0.5"
+  },
+  "optionalDependencies": {
+    "@lancedb/lancedb": "^0.27.2"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.8.0",
     "concurrently": "^9.1.2",
-    "js-yaml": "^4.1.1",
     "typescript": "^5.7.3"
-  },
-  "dependencies": {
-    "@cfworker/json-schema": "^4.1.1",
-    "@modelcontextprotocol/server": "^2.0.0-alpha.2",
-    "better-sqlite3": "^12.9.0"
   }
 }
