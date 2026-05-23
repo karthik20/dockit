@@ -1,5 +1,7 @@
 # Dockit
 
+> Built with [OpenCode](https://opencode.ai), [DeepSeek](https://deepseek.com), and [Claude](https://claude.ai)
+
 > **Local documentation hub** — aggregate, index, and search your project's documentation and source code.
 > Runs entirely offline. Ships as a single CLI binary via npm.
 
@@ -450,3 +452,23 @@ Runtime data (auto-created):
 | Antora | @antora/cli + @antora/site-generator |
 | Archives | unzipper |
 | Knowledge Graph | Graphify (Tree-sitter AST, 15+ languages) |
+
+---
+
+## Credits
+
+Dockit was built with the assistance of the following LLMs and tools:
+
+| Contributor | Role |
+|------------|------|
+| **[OpenCode](https://opencode.ai)** | Primary development agent — architecture, code generation, code review, CLI tooling, MCP server, graph features, npm publishing pipeline |
+| **[DeepSeek](https://deepseek.com)** | Strategic architecture planning, feature design, documentation writing, test planning |
+| **[Claude](https://claude.ai)** (Anthropic) | Codebase exploration, architecture alignment review, security audit |
+
+Special thanks to:
+
+| Tool | Used for |
+|------|---------|
+| **[Graphify](https://github.com/anomalyco/graphify)** | Tree-sitter AST source code knowledge graphs |
+| **[LanceDB](https://lancedb.com)** | Embedded vector search |
+| **[OpenCode](https://opencode.ai)** | Interactive CLI agent framework that orchestrated the entire build pipeline |
