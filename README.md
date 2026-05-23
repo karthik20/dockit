@@ -295,6 +295,61 @@ Traditional code search (grep) finds strings but not structure. Graphify's AST-b
 | "What's the entry point of the build system?" | Guess based on naming conventions | `graph gods` ranks by degree — `BuildUseCase.ts` at #4 |
 | "How does data flow from MCP to SQLite?" | Trace imports across 12 files | `graph path` shows exact chain in 1 command |
 
+### Real LLM use case: adding a new source type to dockit
+
+Here's how an LLM uses graph search to understand the codebase before implementing a feature — end to end, step by step.
+
+**Task**: "Add support for a new documentation source type called 'wiki'."
+
+**Step 1: Find existing source type references** — understand the pattern:
+```bash
+npx @lon-ask/dockit graph query dockit "SourceCodeSourceProcessor"
+```
+Returns `SourceCodeSourceProcessor.ts` — this is the template to follow for a new source processor.
+
+**Step 2: Trace the dependency chain** — where does the processor fit?
+```bash
+npx @lon-ask/dockit graph explain dockit "SourceCodeSourceProcessor.ts"
+```
+Shows the processor is used by: `BuildUseCase.ts`, `mcp.ts`, `index.ts`. The LLM now knows to update these 3 files when adding a new processor.
+
+**Step 3: Find the registration point** — where are processors registered?
+```bash
+npx @lon-ask/dockit graph gods dockit
+```
+`types.ts` is the top god node (degree 59). The LLM knows to check here next.
+
+```bash
+npx @lon-ask/dockit graph query dockit "types"
+```
+Returns `types.ts` in `core/domain/` — this is where `SourceType` is defined. The LLM finds the union type that needs a new `'wiki'` variant.
+
+**Step 4: Trace the full modification path** — from entry point to database:
+```bash
+npx @lon-ask/dockit graph path dockit "mcp.ts" "connection.ts"
+```
+Shows: `mcp.ts` → `getDb()` → `connection.ts`. The LLM now knows how the system starts up and where the DB gets initialized.
+
+**Step 5: Verify no duplicates** — is "wiki" already handled?
+```bash
+npx @lon-ask/dockit graph query dockit "wiki"
+```
+Returns empty — confirmed no existing wiki handling. Safe to proceed.
+
+**Step 6: Before coding, understand the build pipeline**:
+```bash
+npx @lon-ask/dockit graph explain dockit "BuildUseCase.ts"
+```
+Shows 24 connections — the LLM now understands which interfaces (`ISourceProcessor`) and repositories get called during a build. It knows exactly which files to read and which interfaces to implement.
+
+**Result**: The LLM has a complete mental model before writing a single line of code:
+- Files to modify: `types.ts` (add type), `SourceCodeSourceProcessor.ts` (use as template), `BuildUseCase.ts`, `mcp.ts`, `index.ts` (register)
+- Interfaces to implement: `ISourceProcessor`
+- Pattern to follow: `SourceCodeSourceProcessor.ts`
+- Build pipeline behavior: understands how processors get invoked
+
+This turns what would be 20+ minutes of grepping and reading imports into 6 graph commands executed in under 30 seconds.
+
 ### What Graphify supports
 
 | Language | Status |
