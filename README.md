@@ -203,19 +203,125 @@ dockit search react "useState" --get-top 3 --json
 
 ### Knowledge graph workflow
 
+When you run `dockit init --code-path src` on a project, Graphify scans the source code with Tree-sitter (AST parser) and produces a dependency graph. Every file, class, function, and import becomes a node with edges tracking imports, calls, and inheritance.
+
+The examples below use the **dockit source code itself** (built via `dockit init --path . --code-path apps/server/src`).
+
+#### 1. Impact analysis — "What breaks if I change types.ts?"
+
 ```bash
-# Find nodes matching a term
-dockit graph query my-project "database" --limit 5
-
-# See the most-connected nodes (entry points, god classes)
-dockit graph gods my-project
-
-# Trace how two modules are connected
-dockit graph path my-project "app.ts" "database.ts"
-
-# Inspect a node's connections
-dockit graph explain my-project "createApp"
+npx @lon-ask/dockit graph gods dockit --limit 5
 ```
+
+Output:
+```
+Name         Degree  File
+───────────  ──────  ───────────────────────────────
+types.ts     59      server/src/core/domain/types.ts
+index.ts     54      server/src/index.ts
+mcp.ts       49      server/src/mcp.ts
+```
+
+`types.ts` has degree 59 — it's imported by nearly every file in the codebase. Changing it means touching more than half the project. To see exactly which files are affected:
+
+```bash
+npx @lon-ask/dockit graph explain dockit "types.ts"
+```
+
+This reveals all 59 connections — every use case, repository, search engine, route handler, and source processor that depends on domain types.
+
+#### 2. Architecture discovery — "How does the build pipeline work?"
+
+```bash
+npx @lon-ask/dockit graph query dockit "Build"
+```
+
+Finds `BuildUseCase.ts`, `BuildResult`, `.build()` method, constructor — every node related to builds.
+
+```bash
+npx @lon-ask/dockit graph explain dockit "BuildUseCase.ts"
+```
+
+Shows all 24 connections: the 7 port interfaces it depends on (`ISearchEngine`, `ISourceProcessor`, `IEntryRepository`, etc.), the 4 repositories it calls, the search engines it updates. An LLM can understand the full build architecture in one command instead of reading through hundreds of lines of imports.
+
+#### 3. Architecture validation — "Does UI code ever import server code?"
+
+```bash
+npx @lon-ask/dockit graph path dockit "EntryDetail.tsx" "BuildUseCase.ts"
+# → No path found
+```
+
+The graph confirms clean separation: client React components never import server core modules directly. The only bridge is the API client layer:
+
+```bash
+npx @lon-ask/dockit graph query dockit "client.ts"
+# → Finds the HTTP API client — the sole communication channel between UI and server
+```
+
+#### 4. Finding all code that touches a feature — "Where is source-code processing handled?"
+
+```bash
+npx @lon-ask/dockit graph query dockit "SourceCodeSourceProcessor"
+# → Shows the processor class plus everything that references it
+
+npx @lon-ask/dockit graph path dockit "SourceCodeSourceProcessor" "graph.json"
+# → Traces the full path from processor to graph output file
+```
+
+#### 5. Entry points and god classes — "What are the most critical modules?"
+
+```bash
+npx @lon-ask/dockit graph gods dockit --limit 10 --json
+```
+
+Returns ranked by degree (total connections). The top nodes are the ones to be most careful with — they're the architectural keystones. `types.ts` (59), `index.ts` (54), `mcp.ts` (49), `BuildUseCase.ts` (24), `configLoader.ts` (22), `entries.ts` (18).
+
+#### 6. Cross-boundary tracing — "How does the MCP server reach the database?"
+
+```bash
+npx @lon-ask/dockit graph path dockit "mcp.ts" "connection.ts"
+```
+
+Traces: `mcp.ts` → `getDb()` → imports from `connection.ts`. Shows exactly which function calls form the chain.
+
+#### Why this matters for LLMs
+
+Traditional code search (grep) finds strings but not structure. Graphify's AST-based graph lets an LLM:
+
+| Question | Grep approach | Graph approach |
+|----------|--------------|----------------|
+| "What impacts does changing types.ts have?" | Search 59 files manually | `graph explain` shows all 59 connections instantly |
+| "Does the UI import server code?" | Read every import line | `graph path` confirms no path exists |
+| "What's the entry point of the build system?" | Guess based on naming conventions | `graph gods` ranks by degree — `BuildUseCase.ts` at #4 |
+| "How does data flow from MCP to SQLite?" | Trace imports across 12 files | `graph path` shows exact chain in 1 command |
+
+### What Graphify supports
+
+| Language | Status |
+|----------|--------|
+| TypeScript / JavaScript | ✅ Full (imports, calls, classes, functions) |
+| Python | ✅ Full |
+| Java | ✅ Full |
+| Go | ✅ Full |
+| Rust | ✅ Full |
+| C / C++ | ✅ Full |
+| Ruby, PHP, C#, Swift, Kotlin, Scala, Lua, Elixir | ✅ AST parsing (import resolution varies) |
+
+### Enabling graphs on doc sources
+
+Add `graphifyEnabled: true` to any doc source (AsciiDoc, Markdown, Antora) that lives in a repo with source code:
+
+```yaml
+sources:
+  - type: github-markdown
+    label: "API Docs"
+    repoUrl: "https://github.com/myorg/myrepo.git"
+    sourcePath: "docs"              # where .md files live
+    graphifyEnabled: true
+    graphifySourcePath: "src"       # where source code lives
+```
+
+This generates a graph alongside the document index during build. The search engine then boosts results that match graph node names (e.g., searching "BuildUseCase" ranks it higher because it's a known node).
 
 ---
 
@@ -229,22 +335,6 @@ dockit graph explain my-project "createApp"
 | **ZIP Bundle** | Pre-built HTML in a ZIP archive | `url` | `localPath` |
 | **Maven Javadoc** | Javadoc JAR from Maven Central | — | `localJar`, `useMavenCommand` |
 | **Source Code** | Knowledge graph via Graphify Tree-sitter AST | `repoUrl`, `sourcePath`, `branch` | `localPath` |
-
-### Source code knowledge graphs
-
-The `source-code` source type runs [Graphify](https://github.com/safishamsi/graphify) which parses your code with Tree-sitter (AST) and produces a `graph.json` containing nodes (classes, functions, files) and edges (imports, calls, inherits). No LLM required — pure static analysis. Supports TypeScript, JavaScript, Python, Java, Go, Rust, C++, and 10 more languages.
-
-Add `graphifyEnabled: true` to any doc source to also generate a graph alongside the docs:
-
-```yaml
-sources:
-  - type: github-markdown
-    label: "API Docs"
-    repoUrl: "https://github.com/myorg/myrepo.git"
-    sourcePath: "docs"              # where .md files live
-    graphifyEnabled: true
-    graphifySourcePath: "src"       # where source code lives
-```
 
 ---
 
