@@ -16,14 +16,17 @@ import { AntoraSourceProcessor } from './infrastructure/source-processors/Antora
 import { AsciidocSourceProcessor } from './infrastructure/source-processors/AsciidocSourceProcessor.js';
 import { MavenSourceProcessor } from './infrastructure/source-processors/MavenSourceProcessor.js';
 import { GithubMarkdownSourceProcessor } from './infrastructure/source-processors/GithubMarkdownSourceProcessor.js';
+import { SourceCodeSourceProcessor } from './infrastructure/source-processors/SourceCodeSourceProcessor.js';
 import { DocumentNormalizer } from './infrastructure/source-processors/DocumentNormalizer.js';
 import { PathResolver } from './infrastructure/source-processors/PathResolver.js';
+import { GraphifyKnowledgeGraph } from './infrastructure/graph/GraphifyKnowledgeGraph.js';
 import { SqliteEntryReadModel } from './infrastructure/persistence/sqlite/SqliteEntryReadModel.js';
 import { createEntryRoutes } from './routes/entries.js';
 import { createSearchRoutes } from './routes/search.js';
 import { createBuildRoutes } from './routes/build.js';
 import { createSourceRoutes, createSourceFlatRoutes } from './routes/sources.js';
 import viewerRoutes from './routes/viewer.js';
+import { createGraphRoutes } from './routes/graph.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -49,6 +52,7 @@ async function main() {
     new AsciidocSourceProcessor(),
     new MavenSourceProcessor(),
     new GithubMarkdownSourceProcessor(),
+    new SourceCodeSourceProcessor(),
   ];
   const documentNormalizer = new DocumentNormalizer();
   const pathResolver = new PathResolver();
@@ -63,6 +67,7 @@ async function main() {
   app.use('/api/sources', createSourceFlatRoutes(configUseCase));
   app.use('/api', createBuildRoutes(buildUseCase, configUseCase, buildRepo));
   app.use('/api', createSearchRoutes(searchUseCase));
+  app.use('/api', createGraphRoutes(buildRepo, configUseCase));
   app.use('/api', viewerRoutes);
 
   // Global error handler — catches domain errors thrown by use cases

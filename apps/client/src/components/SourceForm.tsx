@@ -14,6 +14,7 @@ const TYPE_LABELS: Record<SourceType, string> = {
   maven: 'Maven',
   asciidoc: 'AsciiDoc',
   'github-markdown': 'GitHub Markdown',
+  'source-code': 'Source Code',
 };
 
 type ZipMode = 'remote' | 'local';
@@ -46,12 +47,19 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
     if (c?.localPath) return 'localDir';
     return 'git';
   }
+  function getInitialScMode(): RepoMode {
+    const c = initial?.config as Record<string, unknown> | undefined;
+    if (c?.localPath) return 'localDir';
+    if (c?.zipPath && !c?.repoUrl) return 'zipFile';
+    return 'git';
+  }
 
   const [zipMode, setZipMode] = useState<ZipMode>(getInitialMode());
   const [mavenMode, setMavenMode] = useState<MavenMode>(getInitialMavenMode());
   const [antoraMode, setAntoraMode] = useState<RepoMode>(getInitialRepoMode());
   const [adocMode, setAdocMode] = useState<RepoMode>(getInitialRepoMode());
   const [ghmdMode, setGhmdMode] = useState<RepoMode>(getInitialGhmdMode());
+  const [scMode, setScMode] = useState<RepoMode>(getInitialScMode());
 
   const [zipUrl, setZipUrl] = useState((initial?.config as { url?: string })?.url || '');
   const [zipLocalPath, setZipLocalPath] = useState((initial?.config as { localPath?: string })?.localPath || '');
@@ -71,6 +79,13 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
   const [ghmdLocalPath, setGhmdLocalPath] = useState((initial?.config as { localPath?: string })?.localPath || '');
   const [ghmdSourcePath, setGhmdSourcePath] = useState((initial?.config as { sourcePath?: string })?.sourcePath || '');
   const [ghmdBranch, setGhmdBranch] = useState((initial?.config as { branch?: string })?.branch || '');
+  const [graphifyEnabled, setGraphifyEnabled] = useState((initial?.config as { graphifyEnabled?: boolean })?.graphifyEnabled || false);
+  const [graphifySourcePath, setGraphifySourcePath] = useState((initial?.config as { graphifySourcePath?: string })?.graphifySourcePath || '');
+  const [scRepoUrl, setScRepoUrl] = useState((initial?.config as { repoUrl?: string })?.repoUrl || '');
+  const [scLocalPath, setScLocalPath] = useState((initial?.config as { localPath?: string })?.localPath || '');
+  const [scZipPath, setScZipPath] = useState((initial?.config as { zipPath?: string })?.zipPath || '');
+  const [scSourcePath, setScSourcePath] = useState((initial?.config as { sourcePath?: string })?.sourcePath || '');
+  const [scBranch, setScBranch] = useState((initial?.config as { branch?: string })?.branch || '');
 
   if (!open) return null;
 
@@ -92,13 +107,13 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
       case 'antora':
         if (antoraMode === 'git') {
           if (!antoraRepoUrl.trim()) { setError('Repository URL is required'); return; }
-          config = { repoUrl: antoraRepoUrl.trim() };
+          config = { repoUrl: antoraRepoUrl.trim(), graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
         } else if (antoraMode === 'localDir') {
           if (!antoraLocalPath.trim()) { setError('Local path is required'); return; }
-          config = { localPath: antoraLocalPath.trim() };
+          config = { localPath: antoraLocalPath.trim(), graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
         } else {
           if (!antoraZipPath.trim()) { setError('ZIP path is required'); return; }
-          config = { zipPath: antoraZipPath.trim() };
+          config = { zipPath: antoraZipPath.trim(), graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
         }
         break;
       case 'maven':
@@ -118,21 +133,33 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
       case 'asciidoc':
         if (adocMode === 'git') {
           if (!adocRepoUrl.trim()) { setError('Repository URL is required'); return; }
-          config = { repoUrl: adocRepoUrl.trim(), sourcePath: adocSourcePath.trim() || undefined };
+          config = { repoUrl: adocRepoUrl.trim(), sourcePath: adocSourcePath.trim() || undefined, graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
         } else if (adocMode === 'localDir') {
           if (!adocLocalPath.trim()) { setError('Local path is required'); return; }
-          config = { localPath: adocLocalPath.trim(), sourcePath: adocSourcePath.trim() || undefined };
+          config = { localPath: adocLocalPath.trim(), sourcePath: adocSourcePath.trim() || undefined, graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
         } else {
-          config = { zipPath: adocZipPath.trim(), sourcePath: adocSourcePath.trim() || undefined };
+          config = { zipPath: adocZipPath.trim(), sourcePath: adocSourcePath.trim() || undefined, graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
         }
         break;
       case 'github-markdown':
         if (ghmdMode === 'git') {
           if (!ghmdRepoUrl.trim()) { setError('Repository URL is required'); return; }
-          config = { repoUrl: ghmdRepoUrl.trim(), sourcePath: ghmdSourcePath.trim() || undefined, branch: ghmdBranch.trim() || undefined };
+          config = { repoUrl: ghmdRepoUrl.trim(), sourcePath: ghmdSourcePath.trim() || undefined, branch: ghmdBranch.trim() || undefined, graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
         } else {
           if (!ghmdLocalPath.trim()) { setError('Local path is required'); return; }
-          config = { localPath: ghmdLocalPath.trim(), sourcePath: ghmdSourcePath.trim() || undefined };
+          config = { localPath: ghmdLocalPath.trim(), sourcePath: ghmdSourcePath.trim() || undefined, graphifyEnabled, graphifySourcePath: graphifySourcePath.trim() || undefined };
+        }
+        break;
+      case 'source-code':
+        if (scMode === 'git') {
+          if (!scRepoUrl.trim()) { setError('Repository URL is required'); return; }
+          config = { repoUrl: scRepoUrl.trim(), sourcePath: scSourcePath.trim() || undefined, branch: scBranch.trim() || undefined, graphifySourcePath: graphifySourcePath.trim() || undefined };
+        } else if (scMode === 'localDir') {
+          if (!scLocalPath.trim()) { setError('Local path is required'); return; }
+          config = { localPath: scLocalPath.trim(), sourcePath: scSourcePath.trim() || undefined, graphifySourcePath: graphifySourcePath.trim() || undefined };
+        } else {
+          if (!scZipPath.trim()) { setError('ZIP file path is required'); return; }
+          config = { zipPath: scZipPath.trim(), sourcePath: scSourcePath.trim() || undefined, graphifySourcePath: graphifySourcePath.trim() || undefined };
         }
         break;
     }
@@ -174,7 +201,7 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
           <div>
             <label className={labelClass}>Type</label>
             <div className="flex gap-2 flex-wrap">
-              {(['zip', 'maven', 'antora', 'asciidoc', 'github-markdown'] as SourceType[]).map((t) => (
+              {(['zip', 'maven', 'antora', 'asciidoc', 'github-markdown', 'source-code'] as SourceType[]).map((t) => (
                 <button key={t} type="button" onClick={() => setType(t)}
                   className={modeBtnClass(type === t)}>
                   {TYPE_LABELS[t]}
@@ -366,6 +393,82 @@ export default function SourceForm({ open, onClose, onCreate, initial }: Props) 
                   <input type="text" value={ghmdBranch} onChange={(e) => setGhmdBranch(e.target.value)}
                     placeholder="e.g. main" className={inputClass} />
                   <p className={helpClass}>Git branch to clone. Defaults to the repository default branch.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'source-code' && (
+            <div className="space-y-3">
+              <div>
+                <label className={labelClass}>Source</label>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => setScMode('git')} className={modeBtnClass(scMode === 'git')}>Git Repo</button>
+                  <button type="button" onClick={() => setScMode('localDir')} className={modeBtnClass(scMode === 'localDir')}>Local Dir</button>
+                  <button type="button" onClick={() => setScMode('zipFile')} className={modeBtnClass(scMode === 'zipFile')}>ZIP File</button>
+                </div>
+              </div>
+              {scMode === 'git' && (
+                <div>
+                  <label className={labelClass}>Repository URL</label>
+                  <input type="text" value={scRepoUrl} onChange={(e) => setScRepoUrl(e.target.value)} placeholder="https://github.com/org/repo.git" className={inputClass} />
+                </div>
+              )}
+              {scMode === 'localDir' && (
+                <div>
+                  <label className={labelClass}>Directory Path</label>
+                  <input type="text" value={scLocalPath} onChange={(e) => setScLocalPath(e.target.value)} placeholder="/home/user/repos/project" className={inputClass} />
+                  <p className={helpClass}>Absolute path to a pre-cloned repository with source code.</p>
+                </div>
+              )}
+              {scMode === 'zipFile' && (
+                <div>
+                  <label className={labelClass}>ZIP File Path</label>
+                  <input type="text" value={scZipPath} onChange={(e) => setScZipPath(e.target.value)} placeholder="/tmp/source-code.zip" className={inputClass} />
+                </div>
+              )}
+              <div>
+                <label className={labelClass}>Source Path <span className="text-text-muted font-normal">(optional)</span></label>
+                <input type="text" value={scSourcePath} onChange={(e) => setScSourcePath(e.target.value)}
+                  placeholder="e.g. src/main/java" className={inputClass} />
+                <p className={helpClass}>Directory within the source to scan. Leave empty to scan the entire source.</p>
+              </div>
+              {scMode === 'git' && (
+                <div>
+                  <label className={labelClass}>Branch <span className="text-text-muted font-normal">(optional)</span></label>
+                  <input type="text" value={scBranch} onChange={(e) => setScBranch(e.target.value)}
+                    placeholder="e.g. main" className={inputClass} />
+                  <p className={helpClass}>Git branch to clone. Defaults to the repository default branch.</p>
+                </div>
+              )}
+              <div className="px-3 py-2 bg-accent/5 ring-1 ring-accent/20 rounded-lg text-xs text-accent">
+                Generates a knowledge graph using Graphify (Tree-sitter AST analysis). Supports 15+ languages.
+              </div>
+            </div>
+          )}
+
+          {(type === 'asciidoc' || type === 'github-markdown' || type === 'antora') && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={graphifyEnabled} onChange={(e) => setGraphifyEnabled(e.target.checked)} />
+                  <div className="w-9 h-5 bg-bg-alt ring-1 ring-border rounded-full peer peer-checked:bg-primary peer-checked:ring-primary/30 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+                </label>
+                <span className="text-sm font-medium text-text">Generate source code knowledge graph</span>
+              </div>
+              {graphifyEnabled && (
+                <div className="space-y-3">
+                  <div>
+                    <label className={labelClass}>Source Code Path <span className="text-text-muted font-normal">(optional)</span></label>
+                    <input type="text" value={graphifySourcePath} onChange={(e) => setGraphifySourcePath(e.target.value)}
+                      placeholder="e.g. core/src/main/java" className={inputClass} />
+                    <p className={helpClass}>
+                      Directory within the repo containing source code. Scan the entire repo if empty (may be slow for large repos).
+                    </p>
+                  </div>
+                  <div className="px-3 py-2 bg-accent/5 ring-1 ring-accent/20 rounded-lg text-xs text-accent">
+                    Runs Graphify (Tree-sitter AST) on the source code to build a structural dependency graph. Auto-installed via pip if not present.
+                  </div>
                 </div>
               )}
             </div>

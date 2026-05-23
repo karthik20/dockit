@@ -18,8 +18,10 @@ import { AntoraSourceProcessor } from './infrastructure/source-processors/Antora
 import { AsciidocSourceProcessor } from './infrastructure/source-processors/AsciidocSourceProcessor.js';
 import { MavenSourceProcessor } from './infrastructure/source-processors/MavenSourceProcessor.js';
 import { GithubMarkdownSourceProcessor } from './infrastructure/source-processors/GithubMarkdownSourceProcessor.js';
+import { SourceCodeSourceProcessor } from './infrastructure/source-processors/SourceCodeSourceProcessor.js';
 import { DocumentNormalizer } from './infrastructure/source-processors/DocumentNormalizer.js';
 import { PathResolver } from './infrastructure/source-processors/PathResolver.js';
+import { GraphifyKnowledgeGraph } from './infrastructure/graph/GraphifyKnowledgeGraph.js';
 import { DATA_ROOT } from './services/paths.js';
 
 const PROJECT_ROOT = path.resolve(DATA_ROOT, '..', '..');
@@ -52,6 +54,7 @@ async function main() {
     new AsciidocSourceProcessor(),
     new MavenSourceProcessor(),
     new GithubMarkdownSourceProcessor(),
+    new SourceCodeSourceProcessor(),
   ];
   const documentNormalizer = new DocumentNormalizer();
   const pathResolver = new PathResolver();
@@ -312,6 +315,111 @@ async function main() {
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
       };
+    },
+  );
+
+  function getKnowledgeGraph(entryId: string): GraphifyKnowledgeGraph {
+    return new GraphifyKnowledgeGraph(path.join(DATA_ROOT, entryId));
+  }
+
+  server.registerTool(
+    `${toolPrefix}graph_query`,
+    {
+      description: 'Search the knowledge graph for an entry. Returns nodes and edges matching the query. Use this instead of dockit_search for source-code-only entries.',
+      inputSchema: fromJsonSchema({
+        type: 'object',
+        properties: {
+          entry: { type: 'string', description: 'Entry ID with a built knowledge graph' },
+          query: { type: 'string', description: 'Text to match against node names, file paths, or types' },
+          limit: { type: 'number', description: 'Maximum nodes to return (default 20)' },
+        },
+        required: ['entry', 'query'],
+      }),
+    },
+    async ({ entry, query, limit: max }: any) => {
+      const kg = getKnowledgeGraph(entry as string);
+      if (!kg.exists()) {
+        return { content: [{ type: 'text' as const, text: 'No knowledge graph found. Build the entry first.' }], isError: true };
+      }
+      const result = kg.query(query as string, (max as number) || 20);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    `${toolPrefix}graph_path`,
+    {
+      description: 'Find the shortest dependency path between two nodes in the knowledge graph.',
+      inputSchema: fromJsonSchema({
+        type: 'object',
+        properties: {
+          entry: { type: 'string', description: 'Entry ID with a built knowledge graph' },
+          from: { type: 'string', description: 'Starting node name or ID' },
+          to: { type: 'string', description: 'Target node name or ID' },
+        },
+        required: ['entry', 'from', 'to'],
+      }),
+    },
+    async ({ entry, from, to }: any) => {
+      const kg = getKnowledgeGraph(entry as string);
+      if (!kg.exists()) {
+        return { content: [{ type: 'text' as const, text: 'No knowledge graph found. Build the entry first.' }], isError: true };
+      }
+      const result = kg.findPath(from as string, to as string);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    `${toolPrefix}graph_explain`,
+    {
+      description: 'Get details about a specific node in the knowledge graph, including its edges and connections.',
+      inputSchema: fromJsonSchema({
+        type: 'object',
+        properties: {
+          entry: { type: 'string', description: 'Entry ID with a built knowledge graph' },
+          node: { type: 'string', description: 'Node name or ID' },
+        },
+        required: ['entry', 'node'],
+      }),
+    },
+    async ({ entry, node }: any) => {
+      const kg = getKnowledgeGraph(entry as string);
+      if (!kg.exists()) {
+        return { content: [{ type: 'text' as const, text: 'No knowledge graph found. Build the entry first.' }], isError: true };
+      }
+      const queryResult = kg.query(node as string);
+      const result = {
+        node: queryResult.nodes[0] || null,
+        connectedNodes: queryResult.nodes.slice(1),
+        edges: queryResult.edges,
+        totalConnections: queryResult.totalEdges,
+      };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    `${toolPrefix}graph_gods`,
+    {
+      description: 'List the most connected nodes (God Nodes) in the knowledge graph. These are the most important classes or modules.',
+      inputSchema: fromJsonSchema({
+        type: 'object',
+        properties: {
+          entry: { type: 'string', description: 'Entry ID with a built knowledge graph' },
+          limit: { type: 'number', description: 'Number of god nodes to return (default 10)' },
+        },
+        required: ['entry'],
+      }),
+    },
+    async ({ entry, limit: max }: any) => {
+      const kg = getKnowledgeGraph(entry as string);
+      if (!kg.exists()) {
+        return { content: [{ type: 'text' as const, text: 'No knowledge graph found. Build the entry first.' }], isError: true };
+      }
+      const nodes = kg.findGodNodes((max as number) || 10);
+      const meta = kg.getMetadata();
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ nodes, metadata: meta }, null, 2) }] };
     },
   );
 

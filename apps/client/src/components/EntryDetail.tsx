@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Pencil, Trash2, Play, Download, Plus,
   Package, GitBranch, FileArchive, FileText, Github, Loader2,
-  CheckCircle, AlertCircle, Clock, MoreHorizontal,
+  CheckCircle, AlertCircle, Clock, MoreHorizontal, FileCode, Network,
 } from 'lucide-react';
 import type { EntryDetail as EntryDetailType, Source, SourceType, SourceConfig } from '../types';
 import { api } from '../api/client';
@@ -18,6 +18,7 @@ const TYPE_ICONS: Record<SourceType, typeof Package> = {
   maven: Package,
   asciidoc: FileText,
   'github-markdown': Github,
+  'source-code': FileCode,
 };
 
 const TYPE_LABELS: Record<SourceType, string> = {
@@ -26,6 +27,7 @@ const TYPE_LABELS: Record<SourceType, string> = {
   maven: 'Maven',
   asciidoc: 'AsciiDoc',
   'github-markdown': 'GitHub Markdown',
+  'source-code': 'Source Code',
 };
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
@@ -45,6 +47,7 @@ export default function EntryDetail() {
   const [error, setError] = useState<string | null>(null);
   const [sourceFormOpen, setSourceFormOpen] = useState(false);
   const [editingSource, setEditingSource] = useState<Source | null>(null);
+  const [formRevision, setFormRevision] = useState(0);
   const [buildKey, setBuildKey] = useState(0);
   const [sourceMenuOpen, setSourceMenuOpen] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | undefined>(undefined);
@@ -220,7 +223,7 @@ export default function EntryDetail() {
               Sources ({entry.sources.length})
             </h3>
             <button
-              onClick={() => { setEditingSource(null); setSourceFormOpen(true); }}
+              onClick={() => { setEditingSource(null); setFormRevision(r => r + 1); setSourceFormOpen(true); }}
               className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
             >
               <Plus size={12} />
@@ -244,6 +247,9 @@ export default function EntryDetail() {
                       <p className="text-[11px] text-text-muted font-mono truncate">{getConfigSummary(source)}</p>
                     </div>
                     <span className="text-[10px] text-text-muted uppercase tracking-wider shrink-0">{TYPE_LABELS[source.type]}</span>
+                    {Boolean((source.config as Record<string, unknown>)?.graphifyEnabled) && (
+                      <Network size={11} className="text-accent shrink-0" aria-label="Knowledge graph enabled" />
+                    )}
                     <div className="relative">
                       <button
                         onClick={() => setSourceMenuOpen(sourceMenuOpen === source.id ? null : source.id)}
@@ -256,7 +262,7 @@ export default function EntryDetail() {
                           <div className="fixed inset-0 z-10" onClick={() => setSourceMenuOpen(null)} />
                           <div className="absolute right-0 top-full mt-1 z-20 bg-surface ring-1 ring-border rounded-lg shadow-lg py-1 w-28">
                             <button
-                              onClick={() => { setEditingSource(source); setSourceFormOpen(true); setSourceMenuOpen(null); }}
+                              onClick={() => { setEditingSource(source); setFormRevision(r => r + 1); setSourceFormOpen(true); setSourceMenuOpen(null); }}
                               className="w-full text-left px-3 py-1.5 text-xs text-text hover:bg-bg-alt transition-colors"
                             >
                               Edit
@@ -293,6 +299,7 @@ export default function EntryDetail() {
       </div>
 
       <SourceForm
+        key={formRevision}
         open={sourceFormOpen}
         onClose={() => { setSourceFormOpen(false); setEditingSource(null); }}
         onCreate={editingSource ? handleEditSource : handleAddSource}
@@ -310,5 +317,6 @@ function getConfigSummary(source: Source): string {
     case 'antora': return c.localPath || c.repoUrl || c.zipPath || '';
     case 'asciidoc': return c.localPath || c.repoUrl || c.zipPath || '';
     case 'github-markdown': return c.localPath || c.repoUrl || '';
+    case 'source-code': return c.localPath || c.repoUrl || c.zipPath || '';
   }
 }

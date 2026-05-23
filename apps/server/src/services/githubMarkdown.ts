@@ -13,6 +13,7 @@ const SKIP_DIRS = new Set([
 async function cloneRepo(repoUrl: string, targetDir: string, branch: string | undefined, log: (msg: string) => void): Promise<void> {
   const branchArg = branch ? ['--branch', branch] : [];
   log(`Cloning repository ${repoUrl}${branch ? ` (branch: ${branch})` : ''}`);
+  if (fs.existsSync(targetDir)) fs.rmSync(targetDir, { recursive: true, force: true });
   return new Promise((resolve, reject) => {
     const proc = spawn('git', ['clone', '--depth', '1', ...branchArg, repoUrl, targetDir], {
       stdio: ['ignore', 'pipe', 'pipe'],

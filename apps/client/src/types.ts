@@ -1,5 +1,5 @@
 export type EntryStatus = 'pending' | 'building' | 'ready' | 'error';
-export type SourceType = 'zip' | 'antora' | 'maven' | 'asciidoc' | 'github-markdown';
+export type SourceType = 'zip' | 'antora' | 'maven' | 'asciidoc' | 'github-markdown' | 'source-code';
 export type SourceStatus = 'pending' | 'building' | 'ready' | 'error';
 export type BuildStatus = 'pending' | 'building' | 'ready' | 'error';
 
@@ -34,6 +34,8 @@ export interface AntoraSourceConfig {
   zipPath?: string;
   localPath?: string;
   playbookOverrides?: Record<string, unknown>;
+  graphifyEnabled?: boolean;
+  graphifySourcePath?: string;
 }
 
 export interface MavenSourceConfig {
@@ -50,6 +52,8 @@ export interface AsciidocSourceConfig {
   zipPath?: string;
   localPath?: string;
   sourcePath?: string;
+  graphifyEnabled?: boolean;
+  graphifySourcePath?: string;
 }
 
 export interface GithubMarkdownSourceConfig {
@@ -57,9 +61,20 @@ export interface GithubMarkdownSourceConfig {
   localPath?: string;
   sourcePath?: string;
   branch?: string;
+  graphifyEnabled?: boolean;
+  graphifySourcePath?: string;
 }
 
-export type SourceConfig = ZipSourceConfig | AntoraSourceConfig | MavenSourceConfig | AsciidocSourceConfig | GithubMarkdownSourceConfig;
+export interface SourceCodeSourceConfig {
+  repoUrl?: string;
+  localPath?: string;
+  zipPath?: string;
+  sourcePath?: string;
+  branch?: string;
+  graphifySourcePath?: string;
+}
+
+export type SourceConfig = ZipSourceConfig | AntoraSourceConfig | MavenSourceConfig | AsciidocSourceConfig | GithubMarkdownSourceConfig | SourceCodeSourceConfig;
 
 export interface Build {
   id: string;

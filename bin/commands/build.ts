@@ -21,6 +21,7 @@ export default async function build(root, positional, flags) {
   const { AsciidocSourceProcessor } = await import(path.join(root, 'apps/server/src/infrastructure/source-processors/AsciidocSourceProcessor.js'));
   const { MavenSourceProcessor } = await import(path.join(root, 'apps/server/src/infrastructure/source-processors/MavenSourceProcessor.js'));
   const { GithubMarkdownSourceProcessor } = await import(path.join(root, 'apps/server/src/infrastructure/source-processors/GithubMarkdownSourceProcessor.js'));
+  const { SourceCodeSourceProcessor } = await import(path.join(root, 'apps/server/src/infrastructure/source-processors/SourceCodeSourceProcessor.js'));
   const { DocumentNormalizer } = await import(path.join(root, 'apps/server/src/infrastructure/source-processors/DocumentNormalizer.js'));
   const { PathResolver } = await import(path.join(root, 'apps/server/src/infrastructure/source-processors/PathResolver.js'));
   const { loadConfig, syncConfigToDb } = await import(path.join(root, 'apps/server/src/services/configLoader.js'));
@@ -28,14 +29,14 @@ export default async function build(root, positional, flags) {
   // Ensure DB is initialized (getDb calls initDb internally)
   const db = getDb();
 
+  const entryRepo = new SqliteEntryRepository(db);
+  const sourceRepo = new SqliteSourceRepository(db);
+  const buildRepo = new SqliteBuildRepository(db);
+
   // Sync config to DB
   const configPath = path.join(root, 'dockit.yaml');
   const config = loadConfig(configPath);
   syncConfigToDb(config, entryRepo, sourceRepo);
-
-  const entryRepo = new SqliteEntryRepository(db);
-  const sourceRepo = new SqliteSourceRepository(db);
-  const buildRepo = new SqliteBuildRepository(db);
   const entryReadModel = new SqliteEntryReadModel(db);
   const searchEngine = await createSearchEngine(entryReadModel, config.search?.engine);
 
@@ -47,6 +48,7 @@ export default async function build(root, positional, flags) {
     new AsciidocSourceProcessor(),
     new MavenSourceProcessor(),
     new GithubMarkdownSourceProcessor(),
+    new SourceCodeSourceProcessor(),
   ];
   const documentNormalizer = new DocumentNormalizer();
   const pathResolver = new PathResolver();

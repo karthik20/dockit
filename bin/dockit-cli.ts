@@ -17,6 +17,7 @@ const commands = {
   build: () => import('./commands/build.js'),
   status: () => import('./commands/status.js'),
   get: () => import('./commands/get.js'),
+  graph: () => import('./commands/graph.js'),
 };
 
 if (command && commands[command]) {
@@ -57,6 +58,16 @@ Commands:
     --json                Output as JSON
   get <entry> <path>      Fetch full document content
     --json                Output as JSON
+  graph query <entry> <query>  Search knowledge graph nodes
+    --limit <n>           Max results (default 20)
+    --json                Output as JSON
+  graph path <entry> <from> <to>  Find shortest path between two nodes
+    --json                Output as JSON
+  graph gods <entry>      List most connected (god) nodes
+    --limit <n>           Max nodes (default 10)
+    --json                Output as JSON
+  graph explain <entry> <node>  Show node details and connections
+    --json                Output as JSON
 
 Examples:
   dockit search react "how to create a hook"
@@ -67,6 +78,9 @@ Examples:
   dockit build quarkus
   dockit status quarkus
   dockit get react asciidoc/getting-started.html
+  dockit graph query dockit-code "SourceCodeSourceProcessor"
+  dockit graph gods dockit-code
+  dockit graph path dockit-code "BuildUseCase" "SourceCodeSourceProcessor"
   dockit serve --port 8080
 `);
 }
