@@ -1,6 +1,6 @@
 # Dockit
 
-> Built with [OpenCode](https://opencode.ai), [DeepSeek](https://deepseek.com), and [Claude](https://claude.ai)
+> Built with [OpenCode](https://opencode.ai) and [DeepSeek](https://deepseek.com)
 
 > **Local documentation hub** — aggregate, index, and search your project's documentation and source code.
 > Runs entirely offline. Ships as a single CLI binary via npm.
@@ -463,7 +463,6 @@ Dockit was built with the assistance of the following LLMs and tools:
 |------------|------|
 | **[OpenCode](https://opencode.ai)** | Primary development agent — architecture, code generation, code review, CLI tooling, MCP server, graph features, npm publishing pipeline |
 | **[DeepSeek](https://deepseek.com)** | Strategic architecture planning, feature design, documentation writing, test planning |
-| **[Claude](https://claude.ai)** (Anthropic) | Codebase exploration, architecture alignment review, security audit |
 
 Special thanks to:
 
