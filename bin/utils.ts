@@ -18,7 +18,8 @@ export function resolveProjectRoot() {
 }
 
 export function resolveDockitHome(): string {
-  return process.env.DOCKIT_DATA_DIR || path.join(os.homedir(), '.dockit');
+  const home = os.homedir() || process.cwd();
+  return process.env.DOCKIT_DATA_DIR || path.join(home, '.dockit');
 }
 
 export function resolveConfigPath(root: string): string {

@@ -30,7 +30,8 @@ export function configure(options?: { cacheDir?: string; offline?: boolean }): v
 
   // Default to dockit home directory for model cache
   if (!options?.cacheDir) {
-    const dataDir = process.env.DOCKIT_DATA_DIR || path.join(os.homedir(), '.dockit');
+    const home = os.homedir() || process.cwd();
+    const dataDir = process.env.DOCKIT_DATA_DIR || path.join(home, '.dockit');
     env.cacheDir = path.join(dataDir, 'models');
   }
 

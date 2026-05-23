@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
+import { load as loadYaml, dump as dumpYaml } from 'js-yaml';
 import { resolveDockitHome, resolveConfigPath } from '../utils.js';
 
 export default async function init(root, positional, flags) {
@@ -125,7 +125,7 @@ export default async function init(root, positional, flags) {
 
   // Write entry config to dockit home
   const homeConfigPath = path.join(dockitHome, 'dockit.yaml');
-  const entryConfig = {
+  const entryYamlObj: Record<string, unknown> = {
     id: entryId,
     name,
     version,
@@ -135,7 +135,7 @@ export default async function init(root, positional, flags) {
         type: 'source-code',
         label: `${label} Code`,
         localPath: sourcePath,
-        sourcePath: codePath || undefined,
+        ...(codePath ? { sourcePath: codePath } : {}),
       },
       {
         type: 'github-markdown',
@@ -146,19 +146,18 @@ export default async function init(root, positional, flags) {
   };
 
   if (fs.existsSync(homeConfigPath)) {
-    const existing = fs.readFileSync(homeConfigPath, 'utf-8');
-    const lines = existing.split('\n');
-    const entriesIdx = lines.findIndex((l) => l.trim().startsWith('entries:'));
-    if (entriesIdx !== -1) {
-      const entryYaml = `\n  - id: ${entryConfig.id}\n    name: ${entryConfig.name}\n    version: ${entryConfig.version}\n    description: ${entryConfig.description}\n    sources:\n      - type: source-code\n        label: ${entryConfig.sources[0].label}\n        localPath: ${entryConfig.sources[0].localPath}${entryConfig.sources[0].sourcePath ? '\n        sourcePath: ' + entryConfig.sources[0].sourcePath : ''}\n      - type: github-markdown\n        label: ${entryConfig.sources[1].label}\n        localPath: ${entryConfig.sources[1].localPath}`;
-      lines.splice(entriesIdx + 1, 0, entryYaml);
-      fs.writeFileSync(homeConfigPath, lines.join('\n'));
+    const existing = loadYaml(fs.readFileSync(homeConfigPath, 'utf-8')) as Record<string, unknown>;
+    const entries = (existing.entries as Record<string, unknown>[]) || [];
+    const existingIdx = entries.findIndex((e) => e.id === entryId);
+    if (existingIdx !== -1) {
+      entries[existingIdx] = entryYamlObj;
     } else {
-      fs.appendFileSync(homeConfigPath, `\nentries:\n  - id: ${entryConfig.id}\n    name: ${entryConfig.name}\n    version: ${entryConfig.version}\n    description: ${entryConfig.description}\n    sources:\n      - type: source-code\n        label: ${entryConfig.sources[0].label}\n        localPath: ${entryConfig.sources[0].localPath}${entryConfig.sources[0].sourcePath ? '\n        sourcePath: ' + entryConfig.sources[0].sourcePath : ''}\n      - type: github-markdown\n        label: ${entryConfig.sources[1].label}\n        localPath: ${entryConfig.sources[1].localPath}`);
+      entries.push(entryYamlObj);
     }
+    existing.entries = entries;
+    fs.writeFileSync(homeConfigPath, dumpYaml(existing, { noRefs: true }));
   } else {
-    const yaml = `entries:\n  - id: ${entryConfig.id}\n    name: ${entryConfig.name}\n    version: ${entryConfig.version}\n    description: ${entryConfig.description}\n    sources:\n      - type: source-code\n        label: ${entryConfig.sources[0].label}\n        localPath: ${entryConfig.sources[0].localPath}${entryConfig.sources[0].sourcePath ? '\n        sourcePath: ' + entryConfig.sources[0].sourcePath : ''}\n      - type: github-markdown\n        label: ${entryConfig.sources[1].label}\n        localPath: ${entryConfig.sources[1].localPath}\n`;
-    fs.writeFileSync(homeConfigPath, yaml);
+    fs.writeFileSync(homeConfigPath, dumpYaml({ entries: [entryYamlObj] }, { noRefs: true }));
   }
 
   console.log('');

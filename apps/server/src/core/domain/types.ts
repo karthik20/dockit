@@ -138,7 +138,6 @@ export interface DockitConfig {
     toolPrefix?: string;
     maxSearchResults?: number;
     autoBuild?: boolean;
-    dataDir?: string;
   };
 }
 
