@@ -471,7 +471,7 @@ Dockit includes a React-based graphical interface for managing entries, configur
 ### Starting the UI
 
 ```bash
-# Development mode — Vite dev server with hot reload
+# Development mode — starts both API server + Vite dev UI concurrently
 npx @lon-ask/dockit dev
 # API → http://localhost:3001
 # UI  → http://localhost:5173
@@ -480,7 +480,15 @@ npx @lon-ask/dockit dev
 npx @lon-ask/dockit serve --port 3001
 ```
 
-The Web UI (`apps/client`) is built with React 19, Vite 6, and Tailwind CSS 4. The compiled assets (`index.html`, JS, CSS) are included in the npm package under `apps/client/dist/`.
+> **Note**: The first `npx` run downloads `tsx` and `vite` (if not locally cached). Subsequent runs use the cached versions and start within seconds.
+
+### How it works under the hood
+
+`dockit dev` spawns two processes in parallel:
+- **API server** — `npx tsx watch apps/server/src/index.ts` (Express + TypeScript, hot reload)
+- **Web UI** — `npx vite apps/client` (React dev server with HMR, port 5173)
+
+The UI proxies `/api/*` requests to the API server at `localhost:3001`. Both processes terminate on Ctrl+C.
 
 ### What the UI provides
 
