@@ -47,9 +47,16 @@ function ensureGraphify(log: (msg: string) => void): void {
     log('Graphify installed successfully');
   }
   try {
-    execSync('pip3 install openai 2>&1', { stdio: 'pipe', timeout: 120_000 });
+    execSync('pip3 show openai 2>&1', { stdio: 'pipe', timeout: 10_000 });
+    log('OpenAI already installed');
   } catch {
-    log('Warning: could not install openai (semantic extraction unavailable)');
+    log('OpenAI not found. Installing for graphify semantic extraction...');
+    try {
+      execSync('pip3 install openai 2>&1', { stdio: 'pipe', timeout: 120_000 });
+      log('OpenAI installed successfully');
+    } catch {
+      log('Warning: could not install openai (semantic extraction unavailable)');
+    }
   }
 }
 
