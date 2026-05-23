@@ -1,239 +1,342 @@
 # Dockit
 
-Local documentation hub that aggregates multiple documentation source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown) into a unified, searchable HTML bundle — useful as LLM context. Also supports **source code knowledge graphs** powered by Graphify (Tree-sitter AST), producing structural dependency graphs for 15+ languages.
+> Built with [OpenCode](https://opencode.ai) and [DeepSeek](https://deepseek.com)
 
-Ships with two search engines: a lightweight **TF-IDF engine** and a **hybrid semantic+keyword engine** (LanceDB + all-MiniLM-L6-v2 embeddings) configurable via a single toggle.
+> **Local documentation hub** — aggregate, index, and search your project's documentation and source code.
+> Runs entirely offline. Ships as a single CLI binary via npm.
 
-All operational data (SQLite DB, build outputs, search indexes, knowledge graphs, embeddings model cache) is stored in `~/.dockit/` by default. Override with the `DOCKIT_DATA_DIR` environment variable.
+## Why Dockit
+
+Modern software teams juggle multiple documentation sources: auto-generated API docs, hand-written Markdown guides, AsciiDoc references, Antora sites, Maven Javadoc JARs, ZIP archives. Each source lives in its own silo with its own search bar. When an LLM coding agent needs to answer a framework question, it either hallucinates from training data or scrolls through GitHub.
+
+Dockit solves this by ingesting **six documentation source types** and **source code** into a single, offline searchable index. It runs entirely on your machine — no cloud, no API keys, no internet required after the initial build.
+
+### What it does
+
+- **Indexes documentation** from ZIP bundles, Maven Javadoc, Antora sites, AsciiDoc repos, GitHub Markdown repos
+- **Builds source code knowledge graphs** via Graphify (Tree-sitter AST) — traces imports, calls, and inheritance across 15+ languages
+- **Searches with hybrid TF-IDF + vector semantic engine** — keyword precision + conceptual understanding
+- **Exposes an MCP server** so AI coding agents (Claude, Cline, OpenCode) can query docs on-demand
+- **Works completely offline** — LanceDB embedded vector DB, ONNX embeddings model, local SQLite
+
+### Who it's for
+
+| Role | Use case |
+|------|----------|
+| **LLM coding agents** | Query up-to-date framework docs instead of relying on stale training data |
+| **Developers** | Search your project's docs + code structure from the terminal |
+| **Teams** | Pre-build doc indexes once, share across the team |
+| **Air-gapped environments** | Full offline operation with pre-seeded models and indexes |
+
+---
+
+## Installation
+
+### Method 1: npm registry (recommended)
+
+```bash
+npm install -g @lon-ask/dockit
+```
+
+After global install, the `dockit` command is available in your PATH:
+
+```bash
+dockit --help
+dockit list
+```
+
+### Method 2: npx (zero-install)
+
+Run dockit on-demand without installing anything:
+
+```bash
+npx @lon-ask/dockit list
+npx @lon-ask/dockit init --path ./my-project --code-path src
+npx @lon-ask/dockit search my-project "authentication"
+```
+
+`npx` downloads the package to a temp cache and executes it. Perfect for one-off usage or CI pipelines. Set `DOCKIT_DATA_DIR` to persist data across invocations.
+
+### Method 3: Build from source
+
+```bash
+git clone https://github.com/karthik20/dockit.git
+cd dockit
+npm install
+npm run build
+npm link                    # makes 'dockit' available globally
+
+pip3 install graphify        # optional — for source code knowledge graphs
+```
+
+### Prerequisites
+
+| Requirement | Needed for |
+|-------------|-----------|
+| Node.js 18+ | Runtime |
+| Python 3.8+ & pip | Graphify source code graphs (optional) |
+| Graphify (`pip install graphify`) | `source-code` source type, `graphifyEnabled` on doc sources |
+| Maven (`mvn`) | Maven Javadoc source type |
+| Antora CLI | Antora source type (auto-installed via npm dep) |
+| Git | Cloning repos for AsciiDoc, Markdown, Source Code sources |
+
+### Data storage
+
+All operational data lives in `~/.dockit/` by default. Override with `DOCKIT_DATA_DIR`:
+
+```bash
+export DOCKIT_DATA_DIR=/path/to/custom/data
+```
+
+| Path | Contents |
+|------|----------|
+| `~/.dockit/dockit.db` | SQLite database (entries, sources, builds) |
+| `~/.dockit/dockit.yaml` | Your config (auto-created by `dockit init`) |
+| `~/.dockit/.lancedb/` | Vector search index (LanceDB) |
+| `~/.dockit/models/` | ONNX embedding model cache |
+| `~/.dockit/{entryId}/bundle/` | Built HTML docs per entry |
+| `~/.dockit/{entryId}/graph.json` | Knowledge graph (source-code entries) |
+
+---
 
 ## Quick Start
 
-```bash
-# 1. Clone and install
-git clone https://github.com/your-org/dockit.git
-cd dockit
-npm install
-pip3 install graphify openai   # optional — for source code graphs
-
-# 2. Make CLI available globally
-npm link
-
-# 3a. Build pre-configured docs (one-time per entry)
-dockit build quarkus
-
-# 3b. Or init a project with source code + markdown scanning
-dockit init --path /path/to/project --code-path src
-
-# 4. Start searching
-dockit search quarkus "configure cache"
-dockit graph query dockit "BuildUseCase"   # if source-code built
-```
-
-## Pre-configured Documentation
-
-| Entry | Version | Source Type | Description |
-|-------|---------|-------------|-------------|
-| **Quarkus** | 3.35 | AsciiDoc | Quarkus framework documentation |
-| **Quarkus Core** | 3.35.2 | Maven Javadoc | Quarkus Core API reference |
-| **React** | 19 | GitHub Markdown | React library documentation |
-| **Spring Boot** | 3.5.x | Antora | Production-ready Spring applications |
-| **Spring Framework** | 7.x | Antora | Core Spring ecosystem reference |
-| **Quarkus Source Code** | 3.35 | Source Code | Quarkus framework source — knowledge graph |
-| **Quarkus (Docs + Code)** | 3.35 | AsciiDoc + Source Code | Docs + code graph combined |
-| **Dockit** | 1.0 | Source Code + Markdown | Self-hosted dockit project entry |
-
-Add your own entries by editing `dockit.yaml` or using `dockit init` — see [Supported Sources](#supported-documentation-sources) below.
-
-## Search Engine
-
-Dockit ships two search engines toggleable via `dockit.yaml`:
-
-```yaml
-search:
-  engine: vector    # 'vector' (default) | 'json' (TF-IDF fallback)
-```
-
-| | JSON (TF-IDF) | Vector (Hybrid) |
-|---|---|---|
-| **Storage per entry** | ~300 KB | ~32 MB (LanceDB) |
-| **Runtime memory** | Minimal | ~200 MB |
-| **Build time** | Fast | Slower (embeds docs via ONNX) |
-| **Search method** | Term-frequency scoring (title 10x, headings 3x, body 1x) | Hybrid: parallel cosine ANN + BM25 FTS → RRF fusion |
-| **Keyword precision** | High (exact term matches) | Very high (FTS component recovers keywords) |
-| **Semantic matching** | None | Yes (finds conceptually related docs even without exact terms) |
-| **Model** | None | `all-MiniLM-L6-v2` via `@huggingface/transformers` (~88 MB ONNX) |
-| **Works offline** | Yes — zero dependencies | Yes — model bundles in npm package |
-
-### How hybrid search works
-
-```
-query → vector (cosine ANN) + BM25 (FTS) in parallel
-         → deduplicate per-path → RRF fusion → top N
-```
-
-- Vector search finds semantically related pages (e.g., "Ahead-of-Time Caching" for a cache query)
-- FTS recovers exact keyword matches (e.g., "caffeine" in the Caching guide)
-- Reciprocal Rank Fusion combines both with dynamic weighting: confident FTS gets 2x weight, uncertain FTS gets 0.7x
-- Title matches in FTS results get an additional 1.5x boost
-
-### When to use each
-
-- **`json`**: Low-resource environments, fast builds, or when exact keyword matching is sufficient
-- **`vector`** (default): Better discovery of non-obvious matches, section-level chunking with heading context in results, hybrid search that matches both keywords and concepts
-
-## CLI Usage (Recommended)
-
-The CLI is the primary way to interact with Dockit. Works from any directory, requires no server process, and is ideal for LLM agents that can execute shell commands.
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `dockit search [<entry>] <query>` | Search documentation |
-| `dockit search <query>` | Global search — top result per entry |
-| `dockit search [<entry>] <query> --get-top [N]` | Fetch full content for top N results (default 3) |
-| `dockit list` | List all entries |
-| `dockit build <entry>` | Build documentation for an entry |
-| `dockit status <entry>` | Check build status |
-| `dockit get <entry> <path>` | Fetch full document content |
-| `dockit graph query <entry> <query>` | Search knowledge graph nodes by name, file, or type |
-| `dockit graph path <entry> <from> <to>` | Find shortest dependency path between two nodes |
-| `dockit graph gods <entry>` | List most connected (god) nodes |
-| `dockit graph explain <entry> <node>` | Show node details and connections |
-| `dockit init --path <dir> [--code-path <subdir>]` | Initialize a project as a dockit source |
-| `dockit dev` | Start dev servers (web UI) |
-| `dockit serve` | Start production server |
-| `dockit mcp` | Start MCP server |
-
-### Search Workflow
-
-**Step 1: Global search** — discover which entries are relevant
+### Index your own project (30 seconds)
 
 ```bash
-dockit search "cache"
-# Returns top result per entry:
-#   [React] cache
-#   [Quarkus] caching-guide
-#   [Quarkus Core] Cache API
+# From your project directory
+npx @lon-ask/dockit init --code-path src
+
+# This:
+#   1. Scans all .md files → searchable docs
+#   2. Runs Graphify on src/ → knowledge graph
+#   3. Builds vector search index
+#   4. Saves config to ~/.dockit/dockit.yaml
 ```
 
-**Step 2: Scoped search** — dive deeper into the chosen entry
+Now search:
 
 ```bash
-dockit search quarkus "cache" --get-top 3
-# Returns full content for top 3 Quarkus cache documents
+npx @lon-ask/dockit search my-project "authentication"
+npx @lon-ask/dockit graph gods my-project
+npx @lon-ask/dockit graph path my-project "createApp" "startServer"
 ```
 
-### Knowledge Graph Queries
-
-For `source-code` entries built with Graphify:
+### Index framework docs
 
 ```bash
-# Search nodes
-dockit graph query dockit-code "BuildUseCase"
+# Build pre-configured entries from dockit.yaml
+dockit build quarkus          # 30 min, 3500+ AsciiDoc pages → ~800 MB vector index
+dockit build react            # 2 min, 200+ Markdown pages
+dockit build spring-boot      # 15 min, Antora site
 
-# List most connected nodes
-dockit graph gods dockit-code --limit 5
-
-# Find shortest path between two nodes
-dockit graph path dockit-code "BuildUseCase" "SourceCodeSourceProcessor"
-
-# Show node details and connections
-dockit graph explain dockit-code "BuildUseCase"
+# Search across all built entries
+dockit search "configure cache"
 ```
 
-### Init a Project
+### Use with an AI agent
 
-```bash
-# From project root — auto-detects name
-dockit init --code-path apps
-
-# With explicit path and version
-dockit init --path /path/to/project --name "MyApp" --version "2.0" --code-path src
-
-# This creates:
-#   - source-code source (graphify on --code-path)
-#   - github-markdown source (scans all .md files)
-#   - Builds both immediately
-```
-
-### Flags
-
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON (for search, list, status, graph) |
-| `--limit <n>` | Max results (default 20) |
-| `--get-top [N]` | Fetch full content for top N results (default 3) |
-| `--port <port>` | Custom port (for serve, mcp --http) |
-
-### Examples
-
-```bash
-# Global search — see which entries match
-dockit search "hooks"
-
-# Scoped search with full content
-dockit search react "how to create a hook" --get-top
-
-# JSON output for scripts/agents
-dockit search react "useState" --get-top 3 --json
-
-# Build documentation
-dockit build quarkus
-dockit status quarkus
-
-# Fetch a specific document
-dockit get react react-docs-markdown/reference/react/hooks.html
-
-# Graph queries
-dockit graph query dockit-code "SourceCodeSourceProcessor"
-dockit graph gods dockit-code
-```
-
-## MCP Server (Optional)
-
-Dockit exposes an MCP (Model Context Protocol) server for AI tools like Claude Desktop, Cline, and OpenCode.
-
-### OpenCode
+Add dockit as an MCP server in your AI tool's config:
 
 ```json
 // ~/.config/opencode/opencode.json
 {
-  "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "dockit": {
       "type": "local",
-      "command": ["bash", "/path/to/dockit/scripts/mcp-wrapper.sh"],
+      "command": ["npx", "@lon-ask/dockit", "mcp"],
       "enabled": true
     }
   }
 }
 ```
 
-### Claude Desktop / Cline
+The agent can then call `dockit_search`, `dockit_graph_query`, etc. automatically.
+
+---
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `dockit init --path <dir> [--code-path <sub>]` | Index a local project (markdown + source code) |
+| `dockit search [<entry>] <query>` | Search documentation |
+| `dockit search [<entry>] <query> --get-top [N]` | Search + fetch full content for top N results |
+| `dockit list` | List all entries |
+| `dockit build <entry>` | Build/rebuild documentation for an entry |
+| `dockit status <entry>` | Check build status |
+| `dockit get <entry> <path>` | Fetch full document by path |
+| `dockit graph query <entry> <query>` | Search knowledge graph nodes |
+| `dockit graph path <entry> <from> <to>` | Find shortest dependency path |
+| `dockit graph gods <entry>` | List most-connected nodes |
+| `dockit graph explain <entry> <node>` | Show node details + connections |
+| `dockit dev` | Start dev servers (Web UI + API) |
+| `dockit serve [--port <p>]` | Start production REST server |
+| `dockit mcp` | Start MCP server for AI agents |
+
+### Flags
+
+| Flag | Applies to | Description |
+|------|-----------|-------------|
+| `--json` | search, list, status, graph | Output as JSON |
+| `--limit <n>` | search, graph query, graph gods | Max results |
+| `--get-top [N]` | search | Fetch full content for top N (default 3) |
+| `--name <n>` | init | Entry display name |
+| `--version <v>` | init | Entry version string |
+| `--code-path <p>` | init | Subdirectory for source code scanning |
+| `--port <p>` | serve, mcp --http | Custom port |
+
+### Search workflow
+
+```bash
+# Step 1: Discover relevant entries
+dockit search "cache"
+# → [React] cache  [Quarkus] caching-guide  [Quarkus Core] Cache API
+
+# Step 2: Deep-dive into one entry with full content
+dockit search quarkus "cache" --get-top 3
+# → Returns plain text of top 3 matching documents
+
+# Step 3: JSON output for scripts
+dockit search react "useState" --get-top 3 --json
+```
+
+### Knowledge graph workflow
+
+```bash
+# Find nodes matching a term
+dockit graph query my-project "database" --limit 5
+
+# See the most-connected nodes (entry points, god classes)
+dockit graph gods my-project
+
+# Trace how two modules are connected
+dockit graph path my-project "app.ts" "database.ts"
+
+# Inspect a node's connections
+dockit graph explain my-project "createApp"
+```
+
+---
+
+## Supported Documentation Sources
+
+| Type | What it indexes | Remote | Local |
+|------|----------------|--------|-------|
+| **GitHub Markdown** | All `.md` files in a repo | `repoUrl`, `sourcePath`, `branch` | `localPath` |
+| **AsciiDoc** | `.adoc` files via Asciidoctor | `repoUrl`, `sourcePath` | `localPath`, `zipPath` |
+| **Antora** | Multi-page Antora documentation sites | `repoUrl` | `localPath`, `zipPath` |
+| **ZIP Bundle** | Pre-built HTML in a ZIP archive | `url` | `localPath` |
+| **Maven Javadoc** | Javadoc JAR from Maven Central | — | `localJar`, `useMavenCommand` |
+| **Source Code** | Knowledge graph via Graphify Tree-sitter AST | `repoUrl`, `sourcePath`, `branch` | `localPath` |
+
+### Source code knowledge graphs
+
+The `source-code` source type runs [Graphify](https://github.com/anomalyco/graphify) which parses your code with Tree-sitter (AST) and produces a `graph.json` containing nodes (classes, functions, files) and edges (imports, calls, inherits). No LLM required — pure static analysis. Supports TypeScript, JavaScript, Python, Java, Go, Rust, C++, and 10 more languages.
+
+Add `graphifyEnabled: true` to any doc source to also generate a graph alongside the docs:
+
+```yaml
+sources:
+  - type: github-markdown
+    label: "API Docs"
+    repoUrl: "https://github.com/myorg/myrepo.git"
+    sourcePath: "docs"              # where .md files live
+    graphifyEnabled: true
+    graphifySourcePath: "src"       # where source code lives
+```
+
+---
+
+## Search Engine
+
+Dockit ships two engines, toggled via `dockit.yaml`:
+
+```yaml
+search:
+  engine: vector    # 'vector' (default) | 'json' (TF-IDF)
+```
+
+| | JSON (TF-IDF) | Vector (Hybrid) |
+|---|---|---|
+| **Storage** | ~300 KB per entry | ~32 MB per entry |
+| **Memory** | Minimal | ~200 MB |
+| **Build speed** | Fast | Slower (embeds all documents) |
+| **Keyword match** | Exact term frequency | BM25 FTS (very high precision) |
+| **Semantic match** | None | Yes (cosine ANN via all-MiniLM-L6-v2) |
+| **Model** | None | 88 MB ONNX, bundled in package |
+| **Offline** | Yes | Yes |
+
+### How hybrid search works
+
+```
+query → [vector cosine ANN] + [BM25 full-text search] in parallel
+         → deduplicate per document path
+         → Reciprocal Rank Fusion combining both
+         → dynamic FTS weighting: 2x for confident matches, 0.7x for uncertain
+         → title match bonus: 1.5x when query terms appear in headings
+```
+
+---
+
+## Config File (`dockit.yaml`)
+
+After running `dockit init`, your config is at `~/.dockit/dockit.yaml`:
+
+```yaml
+entries:
+  - id: my-project
+    name: My Project
+    version: "1.0"
+    description: My project source code and documentation
+    sources:
+      - type: source-code
+        label: "my-project Code"
+        localPath: /home/user/projects/my-project
+        sourcePath: src
+      - type: github-markdown
+        label: "my-project Markdown"
+        localPath: /home/user/projects/my-project
+
+search:
+  engine: vector
+```
+
+Config resolution order:
+1. `~/.dockit/dockit.yaml` — user home (created by `dockit init`)
+2. `./dockit.yaml` — project root (development/backward compatibility)
+
+---
+
+## MCP Server
+
+Dockit exposes 11 MCP tools for AI coding agents. The server can run via stdio (for Claude Desktop, Cline) or HTTP (for custom integrations).
+
+### OpenCode
 
 ```json
-// ~/.claude/claude_desktop_config.json
 {
-  "mcpServers": {
+  "mcp": {
     "dockit": {
-      "command": "bash",
-      "args": ["/path/to/dockit/scripts/mcp-wrapper.sh"]
+      "type": "local",
+      "command": ["npx", "@lon-ask/dockit", "mcp"],
+      "enabled": true
     }
   }
 }
 ```
 
-### HTTP Transport
+### Claude Desktop
 
-```bash
-# Start HTTP bridge on port 3456
-DOCKIT_MCP_HTTP_PORT=3456 ./scripts/mcp-wrapper.sh
-
-# Then curl:
-curl -X POST http://localhost:3456 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```json
+{
+  "mcpServers": {
+    "dockit": {
+      "command": "npx",
+      "args": ["@lon-ask/dockit", "mcp"]
+    }
+  }
+}
 ```
 
 ### MCP Tools
@@ -245,252 +348,126 @@ curl -X POST http://localhost:3456 \
 | `dockit_search` | Search within a specific entry |
 | `dockit_global_search` | Search across all entries |
 | `dockit_get_doc` | Fetch full document content |
-| `dockit_build` / `dockit_build_status` | Build / check status |
-| `dockit_graph_query` | Search knowledge graph (MCP only) |
-| `dockit_graph_path` | Find shortest path between nodes (MCP only) |
-| `dockit_graph_explain` | Node details with edges (MCP only) |
-| `dockit_graph_gods` | Most connected nodes (MCP only) |
+| `dockit_build` | Build documentation for an entry |
+| `dockit_build_status` | Check build status |
+| `dockit_graph_query` | Search knowledge graph nodes |
+| `dockit_graph_path` | Find dependency path between two nodes |
+| `dockit_graph_explain` | Show node details and connections |
+| `dockit_graph_gods` | List most-connected (god) nodes |
 
-## How LLMs Use Dockit
+---
 
-Dockit includes `SKILL.md` — a skill file that instructs LLMs how to use Dockit effectively. When an LLM has access to the `dockit` CLI or MCP tools, it follows this workflow:
+## Offline / Air-Gapped Mode
 
-1. **`dockit list`** / **`dockit_list_entries`** — discover available documentation
-2. **`dockit search "query"`** — global search to find relevant entries
-3. **`dockit search <entry> "query" --get-top`** — scoped search with full content
-4. **For source-code entries**: use `dockit graph query <entry> "node"` for structural queries
-5. **Answer the user's question** using the retrieved documentation as context
+Dockit is designed for full offline operation:
 
-The LLM strips conversational filler from queries, scopes searches to the right entry, and prefers Dockit documentation over training data.
+| Concern | Solution |
+|---------|----------|
+| **No internet** | All models bundled in npm package, LanceDB is embedded (Rust native) |
+| **Corporate proxy** | Set `HTTP_PROXY`/`HTTPS_PROXY` env vars |
+| **Pre-built indexes** | Build on connected machine, copy `~/.dockit/` to target |
+| **Embedding model** | Ships as ONNX (~88 MB). Caches to `~/.dockit/models/` |
+| **Source repos** | Clone once locally, reference via `localPath` in config |
+| **Maven Javadoc** | Download JAR once, reference via `localJar` or use local Maven settings |
 
-## Supported Documentation Sources
-
-| Type | Description | Remote Fields | Local/Offline Fields |
-|------|-------------|---------------|---------------------|
-| **ZIP Bundle** | Download or extract a ZIP of HTML documentation | `url` | `localPath` — path to pre-downloaded .zip |
-| **Maven Artifact** | Download a documentation JAR (javadoc) from Maven Central | *(none extra)* | `useMavenCommand: true` — uses local Maven + settings.xml; `localJar` — path to pre-downloaded .jar |
-| **Antora** | Build a multi-page HTML site with Antora | `repoUrl` | `localPath` — path to pre-cloned repo |
-| **AsciiDoc** | Convert `.adoc` files to HTML | `repoUrl`, `sourcePath` (optional) | `localPath` — path to pre-cloned repo |
-| **GitHub Markdown** | Clone a GitHub repo and convert `.md` files to HTML | `repoUrl`, `sourcePath` (optional), `branch` (optional) | `localPath` — path to pre-cloned repo |
-| **Source Code** | Build a knowledge graph via Graphify (Tree-sitter AST) | `repoUrl`, `sourcePath` (optional), `branch` (optional) | `localPath` — path to local repo |
-| **Combined** | Add `graphifyEnabled: true` on doc sources (AsciiDoc, Markdown, Antora) to also generate a graph | *(inherits from parent type)* | *(inherits from parent type)* |
-
-### Source code knowledge graphs
-
-The `source-code` source type runs [Graphify](https://github.com/anomalyco/graphify) (Tree-sitter AST parser) on the source directory, producing a `graph.json` with nodes (classes, functions, files) and edges (imports, calls, inherits). Supports 15+ languages including TypeScript, JavaScript, Python, Java, Go, Rust, and C++.
-
-**Configuration fields:**
-
-| Field | Description |
-|-------|-------------|
-| `repoUrl` / `localPath` / `zipPath` | Source acquisition (same pattern as other types) |
-| `sourcePath` | Subdirectory to scan for code files |
-| `graphifySourcePath` | Separate subdirectory for graphify (when different from sourcePath e.g. docs vs code) |
-
-For existing doc sources (AsciiDoc, GitHub Markdown, Antora) that point to a repo containing source code, toggle `graphifyEnabled: true` and set `graphifySourcePath` to scan the code during build:
-
-```yaml
-sources:
-  - type: asciidoc
-    label: "Docs"
-    repoUrl: "https://github.com/myorg/myrepo.git"
-    sourcePath: "docs"           # doc files
-    graphifyEnabled: true
-    graphifySourcePath: "src"    # code files for graph
-```
-
-## Offline / Proxy Mode
-
-For environments behind corporate proxies or without internet access, Dockit supports multiple fallback mechanisms:
-
-### Source Repositories (local clones)
-
-Each source type supports local paths that take precedence over remote URLs:
-
-```yaml
-# dockit.yaml — local mode entries
-entries:
-  - id: quarkus-local
-    name: Quarkus (Local)
-    version: "3.35"
-    sources:
-      - type: asciidoc
-        label: "Quarkus Docs"
-        localPath: "/home/user/repos/quarkus"
-        sourcePath: "docs/src/main/asciidoc"
-```
-
-### Embedding Model (air-gapped vector search)
-
-The embedding model downloads on first `embed()` call by default into `~/.dockit/models/`. Override with `DOCKIT_DATA_DIR` or `configure({ cacheDir: '...' })`. For air-gapped environments:
-
-**Option A — Pre-seed on connected machine, then copy:**
-```bash
-# On connected machine
-npm run download-model -w packages/embeddings
-
-# Copy ~/.dockit/models/ to the target machine
-```
-
-**Option B — Install offline via npm:**
-The model ONNX bundle ships inside the `@dockit/embeddings` npm package under `packages/embeddings/model/`. If `~/.dockit/models/` is empty at first `embed()` call, it will attempt to download — set `DOCKIT_DATA_DIR` to point to a pre-seeded directory or use `configure({ cacheDir: '/path/to/model' })`.
-
-### Pre-built Index Bundling
-
-For environments where even building is impractical, LanceDB and JSON indexes can be pre-built and bundled:
-
-1. Build indexes on a connected machine:
-   ```bash
-   dockit build quarkus
-   dockit build spring-boot
-   # ... all desired entries
-   ```
-2. Package the `~/.dockit/` directory (or specific `.lancedb/` + `index.json` files)
-3. Deploy to target machines via the same `~/.dockit/` path
-
-### Proxy Configuration
-
-Standard proxy environment variables:
-
-```bash
-export HTTP_PROXY=http://proxy.corp:8080
-export HTTPS_PROXY=http://proxy.corp:8080
-```
-
-Or override the HuggingFace CDN host via code:
-
-```ts
-import { env } from '@huggingface/transformers';
-env.remoteHost = 'https://internal-mirror.corp';  // point to internal mirror
-```
-
-### Native Binaries
-
-`@lancedb/lancedb` ships prebuilt binaries for linux x64/arm64, macOS x64/arm64, and Windows x64/arm64 — no compilation needed.
-
-### Additional offline fields
-
-| Source Type | Fields (all take precedence over remote) |
-|-------------|------------------------------------------|
-| **ZIP** | `localPath` — path to pre-downloaded .zip |
-| **Maven** | `useMavenCommand: true` — uses local `~/.m2/settings.xml` (proxies, mirrors); `localJar` — pre-downloaded .jar |
-| **Antora** | `localPath` — pre-cloned repo |
-| **AsciiDoc** | `localPath` — pre-cloned repo (kept, not cleaned up) |
-| **GitHub Markdown** | `localPath` — pre-cloned repo |
-| **Source Code** | `localPath` — local repo directory |
-
-## Web UI (Optional)
-
-Dockit includes a web interface for managing entries, configuring sources, and browsing documentation.
-
-```bash
-# Start dev servers
-dockit dev
-# Or: npm run dev
-
-# Frontend → http://localhost:5173
-# Backend  → http://localhost:3001
-```
-
-1. Open http://localhost:5173 in your browser
-2. Click **New Entry** in the sidebar
-3. Add sources (including **Source Code** type) and click **Build Now**
-4. For doc sources with repos, toggle **Generate source code knowledge graph** and set the **Source Code Path**
-5. Use the embedded viewer to browse, or search across indexed content
-
-### Build Modes
-
-- **Build Now** — server-side processing with live log output
-- **Download Script** — exports a self-contained `.sh` script with all curl commands
-
-## Data Storage
-
-All runtime data is stored in `~/.dockit/` by default:
-
-| Path | Description |
-|------|-------------|
-| `~/.dockit/dockit.db` | SQLite database (entries, sources, builds) |
-| `~/.dockit/dockit.yaml` | User configuration (auto-created by `dockit init`) |
-| `~/.dockit/.lancedb/` | Vector search index (LanceDB) |
-| `~/.dockit/models/` | HuggingFace ONNX embedding model cache |
-| `~/.dockit/{entryId}/bundle/` | Built HTML documentation per entry |
-| `~/.dockit/{entryId}/sources/` | Raw source processing artifacts |
-| `~/.dockit/{entryId}/graph.json` | Knowledge graph (source-code entries) |
-
-Override with the environment variable:
-
-```bash
-export DOCKIT_DATA_DIR=/custom/path   # all data goes here instead of ~/.dockit/
-```
-
-Configuration (`dockit.yaml`) is resolved in order:
-1. `~/.dockit/dockit.yaml` (user home, persisted by `dockit init`)
-2. Project root `dockit.yaml` (backward compatibility for development)
+---
 
 ## Architecture
 
 ```
-dockit/
+dockit/                          # npm package @lon-ask/dockit
+├── bin/
+│   ├── dockit.js                # CLI entry point (shebang node)
+│   ├── dockit-cli.ts            # Command router
+│   ├── commands/                # search, build, graph, init, get, list, dev, mcp
+│   └── utils.ts                 # Shared CLI helpers
 ├── apps/
-│   ├── server/          Express + TypeScript backend (port 3001)
+│   ├── server/                  # Express backend (port 3001)
 │   │   └── src/
-│   │       ├── core/domain/           Domain types & knowledge-graph types
-│   │       ├── core/ports/            IKnowledgeGraph, ISourceProcessor + ports
-│   │       ├── core/usecases/         BuildUseCase, ConfigUseCase, SearchUseCase
-│   │       ├── infrastructure/graph/  GraphifyKnowledgeGraph, GraphSearchDecorator
-│   │       ├── infrastructure/source-processors/  SourceCodeSourceProcessor + others
-│   │       └── routes/graph.ts        Graph REST endpoints
-│   └── client/          React + Vite + Tailwind CSS frontend (port 5173)
-├── bin/                 CLI entry point, graph commands, init command
+│   │       ├── core/            # Domain types, ports, use cases
+│   │       ├── infrastructure/  # SQLite, LanceDB, Graphify, processors
+│   │       ├── routes/          # REST API, graph endpoints, viewer
+│   │       └── services/        # Config loader, text extractor, normalizer
+│   └── client/                  # React + Vite web UI (port 5173)
 ├── packages/
-│   └── embeddings/      @dockit/embeddings — ONNX model wrapper (@huggingface/transformers)
-├── ~/.dockit/            Runtime data (created automatically on first run)
-│   ├── dockit.db              SQLite database
-│   ├── dockit.yaml            Entries/sources config (auto-created by `dockit init`)
-│   ├── .lancedb/              Vector search index
-│   ├── models/                HuggingFace ONNX embedding model cache
-│   ├── {entryId}/bundle/      Build outputs per entry
-│   ├── {entryId}/sources/     Raw source processing artifacts
-│   └── {entryId}/graph.json   Knowledge graph (source-code entries)
-├── dockit.yaml          Entries/sources config
-├── SKILL.md             LLM skill instructions
-├── GRAPHIFY_SOURCE_PLAN.md  Graphify feature plan
-└── package.json         npm workspace root
+│   └── embeddings/              # @lon-ask/dockit-embeddings
+│       └── model/               # all-MiniLM-L6-v2 ONNX (88 MB)
+├── scripts/
+│   └── mcp-wrapper.sh           # MCP server launcher
+├── dockit.yaml                  # Example config
+└── SKILL.md                     # LLM agent instructions
 ```
 
-## API Overview
+Runtime data (auto-created):
+```
+~/.dockit/
+├── dockit.db                    # SQLite (entries, sources, builds)
+├── dockit.yaml                  # Your config
+├── .lancedb/                    # Vector search index
+├── models/                      # Embedding model cache
+└── {entryId}/
+    ├── bundle/                  # Normalized HTML docs
+    ├── sources/                 # Raw processing artifacts
+    └── graph.json              # Knowledge graph
+```
+
+---
+
+## API Reference
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET`    | `/api/entries`                    | List entries |
-| `POST`   | `/api/entries`                    | Create entry |
-| `GET`    | `/api/entries/:id`                | Get entry detail + sources |
-| `PUT`    | `/api/entries/:id`                | Update entry |
-| `DELETE` | `/api/entries/:id`                | Delete entry + all data |
-| `POST`   | `/api/entries/:id/sources`        | Add source to entry |
-| `PUT`    | `/api/sources/:id`                | Update source |
-| `DELETE` | `/api/sources/:id`                | Remove source |
-| `POST`   | `/api/entries/:id/build`          | Trigger build |
-| `GET`    | `/api/entries/:id/build-status`   | Poll build progress |
-| `GET`    | `/api/entries/:id/cli-script`     | Download CLI script |
-| `GET`    | `/api/graph/:entry/query?q=...`   | Search knowledge graph nodes |
-| `GET`    | `/api/graph/:entry/path?from=...&to=...` | Find path between nodes |
-| `GET`    | `/api/graph/:entry/gods`          | List most connected nodes |
-| `GET`    | `/api/entries/:id/search?q=term`  | Search built docs |
-| `GET`    | `/api/bundle/:entryId/*`          | Serve bundled HTML |
+| `GET` | `/api/entries` | List entries |
+| `POST` | `/api/entries` | Create entry |
+| `GET` | `/api/entries/:id` | Get entry detail |
+| `PUT` | `/api/entries/:id` | Update entry |
+| `DELETE` | `/api/entries/:id` | Delete entry |
+| `POST` | `/api/entries/:id/sources` | Add source |
+| `PUT` | `/api/sources/:id` | Update source |
+| `DELETE` | `/api/sources/:id` | Remove source |
+| `POST` | `/api/entries/:id/build` | Trigger build |
+| `GET` | `/api/entries/:id/build-status` | Poll build |
+| `GET` | `/api/entries/:id/cli-script` | Download CLI script |
+| `GET` | `/api/graph/:entry/query?q=...` | Graph node search |
+| `GET` | `/api/graph/:entry/path?from=...&to=...` | Graph path find |
+| `GET` | `/api/graph/:entry/gods` | Graph god nodes |
+| `GET` | `/api/entries/:id/search?q=term` | Search docs |
+| `GET` | `/api/bundle/:entryId/*` | Serve HTML |
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 19, TypeScript, Vite 6, Tailwind CSS 4, React Router 7 |
-| Backend | Express 4, TypeScript, tsx |
+| CLI | Node.js, tsx (TypeScript runtime) |
+| Backend | Express 4, TypeScript |
 | Database | SQLite via better-sqlite3 |
-| MCP | @modelcontextprotocol/server 2.0.0-alpha.2 |
-| HTML Parsing | node-html-parser |
+| Vector Search | LanceDB (embedded Rust) |
+| Embeddings | all-MiniLM-L6-v2 ONNX via @huggingface/transformers |
+| Frontend | React 19, Vite 6, Tailwind CSS 4 |
+| MCP | @modelcontextprotocol/server v2 |
+| HTML/MD Parse | node-html-parser, marked |
 | AsciiDoc | @asciidoctor/core |
+| Antora | @antora/cli + @antora/site-generator |
 | Archives | unzipper |
-| Build Pipeline | Antora CLI, Git, Maven dependency plugin |
-| Markdown | marked |
-| Vector Search | LanceDB embedded (Rust native), all-MiniLM-L6-v2 via @huggingface/transformers |
 | Knowledge Graph | Graphify (Tree-sitter AST, 15+ languages) |
+
+---
+
+## Credits
+
+Dockit was built with the assistance of the following LLMs and tools:
+
+| Contributor | Role |
+|------------|------|
+| **[OpenCode](https://opencode.ai)** | Primary development agent — architecture, code generation, code review, CLI tooling, MCP server, graph features, npm publishing pipeline |
+| **[DeepSeek](https://deepseek.com)** | Strategic architecture planning, feature design, documentation writing, test planning |
+
+Special thanks to:
+
+| Tool | Used for |
+|------|---------|
+| **[Graphify](https://github.com/anomalyco/graphify)** | Tree-sitter AST source code knowledge graphs |
+| **[LanceDB](https://lancedb.com)** | Embedded vector search |
+| **[OpenCode](https://opencode.ai)** | Interactive CLI agent framework that orchestrated the entire build pipeline |

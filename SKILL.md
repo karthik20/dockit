@@ -1,6 +1,6 @@
 ---
 name: dockit
-description: Documentation index and search tool that provides on-demand access to up-to-date framework and library documentation for LLM context
+description: Documentation index and search tool providing on-demand framework/library docs and source code knowledge graphs for LLM context
 license: MIT
 compatibility: opencode
 metadata:
@@ -8,147 +8,138 @@ metadata:
   workflow: documentation
 ---
 
-## What I do
-- Search and retrieve documentation for frameworks and libraries (e.g., Quarkus, Spring Boot, React)
-- Provide API documentation, class references, and configuration guides
-- Fetch full document content for LLM context via CLI or MCP tools
+## What dockit does
 
-## When to use me
-Use this skill when the user asks about:
-- How to use a specific framework or library
-- API documentation, class references, or configuration reference
-- Any technology listed in available dockit entries
+Dockit is a local documentation hub. It indexes documentation from multiple sources (GitHub Markdown, AsciiDoc, Antora, Maven Javadoc, ZIP archives) and builds source code knowledge graphs (Tree-sitter AST via Graphify). It provides hybrid TF-IDF + vector semantic search across all indexed content.
 
-## Primary Method: CLI Commands
+Run it from the terminal — no server process required. No internet needed after build.
 
-The `dockit` CLI is the recommended way to search and retrieve documentation.
-
-### `dockit list`
-Lists all configured documentation entries. Run this first to discover what's available.
-
-### `dockit search [<entry>] <query>`
-Searches documentation. Always provide the entry name as the first argument when you know which framework the question is about.
+## Installation
 
 ```bash
-# Scoped to a specific entry (recommended)
-dockit search react "how to create a hook"
-dockit search quarkus "configure cache"
-
-# Global search — top result per entry (when unsure which entry)
-dockit search "cache"
+npm install -g @lon-ask/dockit
 ```
 
-### `dockit search [<entry>] <query> --get-top [N]`
-Searches and fetches full document content for the top N results (default 3). This is the **primary command for LLMs** — it combines search + content retrieval in one step.
+Or use `npx` without installing:
 
 ```bash
-# Get full content for top 3 results
-dockit search react "useState" --get-top
-
-# Get full content for top 5 results, as JSON
-dockit search react "hooks" --get-top 5 --json
+npx @lon-ask/dockit <command>
 ```
 
-### `dockit get <entry> <path>`
-Fetches full content of a specific document by path (from search results).
+All data is stored in `~/.dockit/` by default. Override with `DOCKIT_DATA_DIR`.
 
-### `dockit build <entry>` / `dockit status <entry>`
-Builds documentation or checks build status.
+## When to use dockit
 
-## Recommended Workflow
+Use when you need:
+- Up-to-date framework/library documentation instead of stale training data
+- API reference, class docs, or configuration guides
+- Source code structure analysis (imports, calls, inheritance graphs)
+- To find which files/modules a function touches in a codebase
 
-### Step 1: Identify the entry
-Determine which documentation entry is relevant:
-- "How do I use useState in React?" → entry: `react`
-- "How to configure cache in Quarkus?" → entry: `quarkus`
+## Core Workflow
 
-If unsure, run `dockit list` to see available entries.
+### Step 1: Discover available documentation
 
-### Step 2: Search pattern
-**Global search** (no entry) — returns top result per entry:
+```bash
+dockit list
+# or
+npx @lon-ask/dockit list
+```
+
+### Step 2: Global search (find the right entry)
+
 ```bash
 dockit search "cache"
+# Returns top result per built entry
 ```
 
-**Scoped search** (with entry) — dive deeper:
+### Step 3: Scoped search with full content
+
 ```bash
-dockit search quarkus "cache" --get-top 3
+dockit search quarkus "configure cache" --get-top 3
 ```
 
-Always scope to the entry once you know which framework the user is asking about.
+The `--get-top` flag fetches full document text for the top N results. This is the primary command for LLMs — it combines search + retrieval in one invocation.
 
-### Step 3: Refine the query
-Strip conversational filler. Keep only technical terms:
+### Step 4: Knowledge graph queries (source-code entries)
 
-| User Question | Good Query |
+For entries with `source-code` sources:
+
+```bash
+dockit graph query my-project "database" --limit 10     # find nodes by name/file/type
+dockit graph gods my-project                            # most-connected nodes
+dockit graph path my-project "app.ts" "database.ts"     # dependency path
+dockit graph explain my-project "createApp"             # node details + connections
+```
+
+## CLI Reference
+
+| Command | Purpose |
+|---------|---------|
+| `dockit list` | List all configured entries |
+| `dockit search [<entry>] <query>` | Search docs (scoped or global) |
+| `dockit search [<entry>] <query> --get-top [N]` | Search + full content for top N |
+| `dockit get <entry> <path>` | Fetch specific document by path |
+| `dockit build <entry>` | Build/rebuild documentation |
+| `dockit status <entry>` | Check build status |
+| `dockit init --path <dir> [--code-path <sub>]` | Index a local project |
+| `dockit graph query <entry> <query>` | Search graph nodes |
+| `dockit graph path <entry> <from> <to>` | Dependency path between nodes |
+| `dockit graph gods <entry>` | Highest-degree (most connected) nodes |
+| `dockit graph explain <entry> <node>` | Node details with edges |
+
+## Query Refinement
+
+Strip conversational filler. Keep only technical keywords:
+
+| User question | Good query |
 |---------------|------------|
 | "How do I create a custom hook in React?" | `"create custom hook"` |
-| "What is the latest Quarkus feature for caching?" | `"cache latest feature"` |
+| "What's the Quarkus caching configuration?" | `"caching configuration"` |
+| "How does the auth middleware work?" | `"auth middleware"` |
+| "Find all files that import database.ts" | `graph query my-project "database.ts"` |
 
-### Step 4: Handle missing builds
-If an entry shows status `pending` or `error`, build it first:
+## Entry Types and Behavior
+
+| Entry has | `dockit search` | `dockit graph` |
+|-----------|----------------|-----------------|
+| Docs only | Returns results | No graph available |
+| Source code only | Returns empty | Use graph tools |
+| Docs + code | Returns results (graph-boosted) | Graph tools work |
+
+## Build Status
+
+Entries start as `pending`. Build them before searching:
+
 ```bash
-dockit build react
-dockit status react
+dockit build quarkus
+dockit status quarkus    # wait for "ready"
 ```
 
-## Alternative: MCP Tools
+If an entry shows `error`, check the build log via `dockit status <entry> --json`.
 
-If Dockit is configured as an MCP server, use `dockit_*` tools instead of CLI commands:
+## MCP Tools
+
+If configured as an MCP server, use these tools instead of CLI:
 
 | MCP Tool | CLI Equivalent |
 |----------|----------------|
 | `dockit_list_entries` | `dockit list` |
+| `dockit_find_entry` | — |
 | `dockit_global_search` | `dockit search "query"` |
 | `dockit_search` | `dockit search <entry> "query"` |
 | `dockit_get_doc` | `dockit get <entry> <path>` |
-| `dockit_build` / `dockit_build_status` | `dockit build` / `dockit status` |
-| `dockit_graph_query` | (MCP only) |
-| `dockit_graph_path` | (MCP only) |
-| `dockit_graph_explain` | (MCP only) |
-| `dockit_graph_gods` | (MCP only) |
+| `dockit_build` | `dockit build <entry>` |
+| `dockit_build_status` | `dockit status <entry>` |
+| `dockit_graph_query` | `dockit graph query` |
+| `dockit_graph_path` | `dockit graph path` |
+| `dockit_graph_explain` | `dockit graph explain` |
+| `dockit_graph_gods` | `dockit graph gods` |
 
-## Source Code Entries (Knowledge Graph)
+## Key Constraints
 
-For entries with `source-code` sources, the primary query mechanism is the **knowledge graph** instead of text search. Graphify's Tree-sitter AST pass parses 15+ languages and produces structural edges (*calls*, *imports*, *inherits*).
-
-### Graph MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `dockit_graph_query <entry> <query>` | Search graph nodes by name, file, or type |
-| `dockit_graph_path <entry> <from> <to>` | Find shortest dependency path between two nodes |
-| `dockit_graph_explain <entry> <node>` | Get node details with edges and connections |
-| `dockit_graph_gods <entry>` | List most connected (highest-degree) nodes |
-
-### Behavior by Entry Type
-
-| Entry Type | Search | Graph Query |
-|------------|--------|-------------|
-| Source-code only | `dockit search` returns empty | Use `dockit_graph_*` tools |
-| Mixed (docs + code) | `dockit search` works + results graph-boosted | `dockit_graph_*` tools work |
-| Docs only | `dockit search` works | No graph tools |
-
-## Notes
 - Documentation is plain text extracted from HTML
-- Content is truncated at 50KB per document
-- Entries start as `pending` and must be built before searchable
-
-## Always Show Source
-
-After answering with documentation content, always display the source in a table at the end:
-
-| Field | Value |
-|-------|-------|
-| **Type** | `<source type>` |
-| **Label** | `<source label>` |
-| **Repo** | `<repoUrl>` |
-| **Source Path** | `<sourcePath>` |
-| **Version** | `<entry version>` |
-
-To get source details, use `--json` flag with search or check `dockit list --json`. Source fields come from the entry's `sources` array in `dockit.yaml`:
-- `type` — source type (e.g., `github-markdown`, `asciidoc`, `maven`, `source-code`)
-- `label` — human-readable label
-- `repoUrl` or `localPath` — repository URL or local path
-- `sourcePath` — path within the repo
-- Entry `version` — the version of the documentation entry
+- Content is truncated at 50 KB per document
+- Documents must be built before searchable (status = `ready`)
+- Knowledge graph requires `graphify` Python package and source-code source type
+- All data is local. No cloud, no API keys required
