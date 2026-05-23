@@ -5,7 +5,7 @@ export class EmbeddingService {
   private async init() {
     if (this.initialized) return;
 
-    const mod = await import('@dockit/embeddings');
+    const mod = await import('@lon-ask/dockit-embeddings');
     // Configure for bundled offline mode by default.
     // env.cacheDir defaults to <package>/model/; allowRemoteModels defaults to true
     // (permits download if model not yet cached). For air-gapped environments,
