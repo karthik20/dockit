@@ -170,7 +170,7 @@ The agent can then call `dockit_search`, `dockit_graph_query`, etc. automaticall
 | `dockit graph path <entry> <from> <to>` | Find shortest dependency path |
 | `dockit graph gods <entry>` | List most-connected nodes |
 | `dockit graph explain <entry> <node>` | Show node details + connections |
-| `dockit dev` | Start dev servers (Web UI + API) |
+| `dockit dev` | Start dev servers (Web UI on :5173 + API on :3001) |
 | `dockit serve [--port <p>]` | Start production REST server |
 | `dockit mcp` | Start MCP server for AI agents |
 
@@ -461,6 +461,59 @@ cp SKILL.md ~/.config/opencode/skills/dockit/SKILL.md
 | `dockit_graph_path` | Find dependency path between two nodes |
 | `dockit_graph_explain` | Show node details and connections |
 | `dockit_graph_gods` | List most-connected (god) nodes |
+
+---
+
+## Web UI
+
+Dockit includes a React-based graphical interface for managing entries, configuring sources, and browsing documentation. It runs alongside the API server.
+
+### Starting the UI
+
+```bash
+# Development mode — Vite dev server with hot reload
+npx @lon-ask/dockit dev
+# API → http://localhost:3001
+# UI  → http://localhost:5173
+
+# Production mode — API server only (UI not served yet)
+npx @lon-ask/dockit serve --port 3001
+```
+
+The Web UI (`apps/client`) is built with React 19, Vite 6, and Tailwind CSS 4. The compiled assets (`index.html`, JS, CSS) are included in the npm package under `apps/client/dist/`.
+
+### What the UI provides
+
+| Feature | Description |
+|---------|-------------|
+| **Entry management** | Create, edit, and delete documentation entries via a form |
+| **Source configuration** | Add/remove/reorder sources per entry — supports all 6 source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown, Source Code) |
+| **Source form** | Mode selector (Git Repo / Local Dir / ZIP File), Graphify toggle with source path field |
+| **Build triggering** | One-click build with live streaming logs |
+| **Download script** | Export build as a self-contained `.sh` script (for CI/reproducible builds) |
+| **Document viewer** | Browse built HTML docs in the browser |
+| **Entry detail** | Shows all sources, graph status badge (Network icon when graphify is enabled), build history |
+| **Status badges** | Quick visual indicators for entry status (pending/building/ready/error) per source |
+
+### What it shows
+
+The UI surfaces the same data as the CLI, but visually:
+
+1. **Sidebar** — list of all entries with status badges
+2. **Entry page** — entry metadata (name, version, description) + sources list + build controls
+3. **Source editor** — configure type, URL/path, source path, graphify toggle
+4. **Build log** — real-time output stream during builds
+5. **Graph status** — which entries have knowledge graphs built
+
+### Architecture
+
+```
+Browser (port 5173) ←→ API Server (port 3001)
+                          ↓
+                     SQLite DB  +  LanceDB  +  ~/.dockit/
+```
+
+The UI communicates with the Express API via REST endpoints (`/api/entries`, `/api/sources`, `/api/build`, etc.). All data CRUD, search, and build operations are done through the same API that the CLI and MCP server use.
 
 ---
 
