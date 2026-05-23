@@ -1,6 +1,8 @@
 # Dockit
 
-Local documentation hub that aggregates multiple documentation source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown) into a unified, searchable HTML bundle — useful as LLM context. Ships with two search engines: a lightweight **TF-IDF engine** and a **hybrid semantic+keyword engine** (LanceDB + all-MiniLM-L6-v2 embeddings) configurable via a single toggle.
+Local documentation hub that aggregates multiple documentation source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown) into a unified, searchable HTML bundle — useful as LLM context. Also supports **source code knowledge graphs** powered by Graphify (Tree-sitter AST), producing structural dependency graphs for 15+ languages.
+
+Ships with two search engines: a lightweight **TF-IDF engine** and a **hybrid semantic+keyword engine** (LanceDB + all-MiniLM-L6-v2 embeddings) configurable via a single toggle.
 
 ## Quick Start
 
@@ -9,22 +11,23 @@ Local documentation hub that aggregates multiple documentation source types (ZIP
 git clone https://github.com/your-org/dockit.git
 cd dockit
 npm install
+pip3 install graphify openai   # optional — for source code graphs
 
 # 2. Make CLI available globally
 npm link
 
-# 3. Build docs (one-time per entry)
+# 3a. Build pre-configured docs (one-time per entry)
 dockit build quarkus
+
+# 3b. Or init a project with source code + markdown scanning
+dockit init --path /path/to/project --code-path src
 
 # 4. Start searching
 dockit search quarkus "configure cache"
+dockit graph query dockit "BuildUseCase"   # if source-code built
 ```
 
-That's it. Five entries are pre-configured in `dockit.yaml`. Entries start as `pending` — build one or more before searching.
-
 ## Pre-configured Documentation
-
-Dockit ships with five entries ready to build:
 
 | Entry | Version | Source Type | Description |
 |-------|---------|-------------|-------------|
@@ -33,8 +36,11 @@ Dockit ships with five entries ready to build:
 | **React** | 19 | GitHub Markdown | React library documentation |
 | **Spring Boot** | 3.5.x | Antora | Production-ready Spring applications |
 | **Spring Framework** | 7.x | Antora | Core Spring ecosystem reference |
+| **Quarkus Source Code** | 3.35 | Source Code | Quarkus framework source — knowledge graph |
+| **Quarkus (Docs + Code)** | 3.35 | AsciiDoc + Source Code | Docs + code graph combined |
+| **Dockit** | 1.0 | Source Code + Markdown | Self-hosted dockit project entry |
 
-Add your own entries by editing `dockit.yaml` — see [Supported Sources](#supported-documentation-sources) below.
+Add your own entries by editing `dockit.yaml` or using `dockit init` — see [Supported Sources](#supported-documentation-sources) below.
 
 ## Search Engine
 
@@ -88,6 +94,11 @@ The CLI is the primary way to interact with Dockit. Works from any directory, re
 | `dockit build <entry>` | Build documentation for an entry |
 | `dockit status <entry>` | Check build status |
 | `dockit get <entry> <path>` | Fetch full document content |
+| `dockit graph query <entry> <query>` | Search knowledge graph nodes by name, file, or type |
+| `dockit graph path <entry> <from> <to>` | Find shortest dependency path between two nodes |
+| `dockit graph gods <entry>` | List most connected (god) nodes |
+| `dockit graph explain <entry> <node>` | Show node details and connections |
+| `dockit init --path <dir> [--code-path <subdir>]` | Initialize a project as a dockit source |
 | `dockit dev` | Start dev servers (web UI) |
 | `dockit serve` | Start production server |
 | `dockit mcp` | Start MCP server |
@@ -111,12 +122,45 @@ dockit search quarkus "cache" --get-top 3
 # Returns full content for top 3 Quarkus cache documents
 ```
 
+### Knowledge Graph Queries
+
+For `source-code` entries built with Graphify:
+
+```bash
+# Search nodes
+dockit graph query dockit-code "BuildUseCase"
+
+# List most connected nodes
+dockit graph gods dockit-code --limit 5
+
+# Find shortest path between two nodes
+dockit graph path dockit-code "BuildUseCase" "SourceCodeSourceProcessor"
+
+# Show node details and connections
+dockit graph explain dockit-code "BuildUseCase"
+```
+
+### Init a Project
+
+```bash
+# From project root — auto-detects name
+dockit init --code-path apps
+
+# With explicit path and version
+dockit init --path /path/to/project --name "MyApp" --version "2.0" --code-path src
+
+# This creates:
+#   - source-code source (graphify on --code-path)
+#   - github-markdown source (scans all .md files)
+#   - Builds both immediately
+```
+
 ### Flags
 
 | Flag | Description |
 |------|-------------|
-| `--json` | Output as JSON (for search, list, status) |
-| `--limit <n>` | Max search results (default 20) |
+| `--json` | Output as JSON (for search, list, status, graph) |
+| `--limit <n>` | Max results (default 20) |
 | `--get-top [N]` | Fetch full content for top N results (default 3) |
 | `--port <port>` | Custom port (for serve, mcp --http) |
 
@@ -138,11 +182,15 @@ dockit status quarkus
 
 # Fetch a specific document
 dockit get react react-docs-markdown/reference/react/hooks.html
+
+# Graph queries
+dockit graph query dockit-code "SourceCodeSourceProcessor"
+dockit graph gods dockit-code
 ```
 
 ## MCP Server (Optional)
 
-Dockit exposes an MCP (Model Context Protocol) server for AI tools like Claude Desktop, Cline, and OpenCode. This is an alternative to the CLI — use whichever fits your workflow.
+Dockit exposes an MCP (Model Context Protocol) server for AI tools like Claude Desktop, Cline, and OpenCode.
 
 ### OpenCode
 
@@ -180,9 +228,6 @@ Dockit exposes an MCP (Model Context Protocol) server for AI tools like Claude D
 # Start HTTP bridge on port 3456
 DOCKIT_MCP_HTTP_PORT=3456 ./scripts/mcp-wrapper.sh
 
-# Or directly
-npx tsx apps/server/src/mcp.ts
-
 # Then curl:
 curl -X POST http://localhost:3456 \
   -H "Content-Type: application/json" \
@@ -199,6 +244,10 @@ curl -X POST http://localhost:3456 \
 | `dockit_global_search` | Search across all entries |
 | `dockit_get_doc` | Fetch full document content |
 | `dockit_build` / `dockit_build_status` | Build / check status |
+| `dockit_graph_query` | Search knowledge graph (MCP only) |
+| `dockit_graph_path` | Find shortest path between nodes (MCP only) |
+| `dockit_graph_explain` | Node details with edges (MCP only) |
+| `dockit_graph_gods` | Most connected nodes (MCP only) |
 
 ## How LLMs Use Dockit
 
@@ -207,7 +256,8 @@ Dockit includes `SKILL.md` — a skill file that instructs LLMs how to use Docki
 1. **`dockit list`** / **`dockit_list_entries`** — discover available documentation
 2. **`dockit search "query"`** — global search to find relevant entries
 3. **`dockit search <entry> "query" --get-top`** — scoped search with full content
-4. **Answer the user's question** using the retrieved documentation as context
+4. **For source-code entries**: use `dockit graph query <entry> "node"` for structural queries
+5. **Answer the user's question** using the retrieved documentation as context
 
 The LLM strips conversational filler from queries, scopes searches to the right entry, and prefers Dockit documentation over training data.
 
@@ -220,6 +270,32 @@ The LLM strips conversational filler from queries, scopes searches to the right 
 | **Antora** | Build a multi-page HTML site with Antora | `repoUrl` | `localPath` — path to pre-cloned repo |
 | **AsciiDoc** | Convert `.adoc` files to HTML | `repoUrl`, `sourcePath` (optional) | `localPath` — path to pre-cloned repo |
 | **GitHub Markdown** | Clone a GitHub repo and convert `.md` files to HTML | `repoUrl`, `sourcePath` (optional), `branch` (optional) | `localPath` — path to pre-cloned repo |
+| **Source Code** | Build a knowledge graph via Graphify (Tree-sitter AST) | `repoUrl`, `sourcePath` (optional), `branch` (optional) | `localPath` — path to local repo |
+| **Combined** | Add `graphifyEnabled: true` on doc sources (AsciiDoc, Markdown, Antora) to also generate a graph | *(inherits from parent type)* | *(inherits from parent type)* |
+
+### Source code knowledge graphs
+
+The `source-code` source type runs [Graphify](https://github.com/anomalyco/graphify) (Tree-sitter AST parser) on the source directory, producing a `graph.json` with nodes (classes, functions, files) and edges (imports, calls, inherits). Supports 15+ languages including TypeScript, JavaScript, Python, Java, Go, Rust, and C++.
+
+**Configuration fields:**
+
+| Field | Description |
+|-------|-------------|
+| `repoUrl` / `localPath` / `zipPath` | Source acquisition (same pattern as other types) |
+| `sourcePath` | Subdirectory to scan for code files |
+| `graphifySourcePath` | Separate subdirectory for graphify (when different from sourcePath e.g. docs vs code) |
+
+For existing doc sources (AsciiDoc, GitHub Markdown, Antora) that point to a repo containing source code, toggle `graphifyEnabled: true` and set `graphifySourcePath` to scan the code during build:
+
+```yaml
+sources:
+  - type: asciidoc
+    label: "Docs"
+    repoUrl: "https://github.com/myorg/myrepo.git"
+    sourcePath: "docs"           # doc files
+    graphifyEnabled: true
+    graphifySourcePath: "src"    # code files for graph
+```
 
 ## Offline / Proxy Mode
 
@@ -307,6 +383,7 @@ env.remoteHost = 'https://internal-mirror.corp';  // point to internal mirror
 | **Antora** | `localPath` — pre-cloned repo |
 | **AsciiDoc** | `localPath` — pre-cloned repo (kept, not cleaned up) |
 | **GitHub Markdown** | `localPath` — pre-cloned repo |
+| **Source Code** | `localPath` — local repo directory |
 
 ## Web UI (Optional)
 
@@ -323,8 +400,9 @@ dockit dev
 
 1. Open http://localhost:5173 in your browser
 2. Click **New Entry** in the sidebar
-3. Add sources and click **Build Now** to process into a unified HTML bundle
-4. Use the embedded viewer to browse, or search across indexed content
+3. Add sources (including **Source Code** type) and click **Build Now**
+4. For doc sources with repos, toggle **Generate source code knowledge graph** and set the **Source Code Path**
+5. Use the embedded viewer to browse, or search across indexed content
 
 ### Build Modes
 
@@ -337,15 +415,21 @@ dockit dev
 dockit/
 ├── apps/
 │   ├── server/          Express + TypeScript backend (port 3001)
+│   │   └── src/
+│   │       ├── core/domain/           Domain types & knowledge-graph types
+│   │       ├── core/ports/            IKnowledgeGraph, ISourceProcessor + ports
+│   │       ├── core/usecases/         BuildUseCase, ConfigUseCase, SearchUseCase
+│   │       ├── infrastructure/graph/  GraphifyKnowledgeGraph, GraphSearchDecorator
+│   │       ├── infrastructure/source-processors/  SourceCodeSourceProcessor + others
+│   │       └── routes/graph.ts        Graph REST endpoints
 │   └── client/          React + Vite + Tailwind CSS frontend (port 5173)
-├── bin/                 CLI entry point and commands
+├── bin/                 CLI entry point, graph commands, init command
 ├── packages/
 │   └── embeddings/      @dockit/embeddings — ONNX model wrapper (@huggingface/transformers)
-├── data/                Runtime data (SQLite DB, extracted sources, HTML bundles, LanceDB indexes)
+├── data/                Runtime data (SQLite DB, extracted sources, HTML bundles, LanceDB indexes, graph.json)
 ├── dockit.yaml          Entries/sources config
 ├── SKILL.md             LLM skill instructions
-├── PLAN.md              Full architecture document
-├── LOCAL_MODE_PLAN.md   Offline/proxy mode plan
+├── GRAPHIFY_SOURCE_PLAN.md  Graphify feature plan
 └── package.json         npm workspace root
 ```
 
@@ -364,6 +448,9 @@ dockit/
 | `POST`   | `/api/entries/:id/build`          | Trigger build |
 | `GET`    | `/api/entries/:id/build-status`   | Poll build progress |
 | `GET`    | `/api/entries/:id/cli-script`     | Download CLI script |
+| `GET`    | `/api/graph/:entry/query?q=...`   | Search knowledge graph nodes |
+| `GET`    | `/api/graph/:entry/path?from=...&to=...` | Find path between nodes |
+| `GET`    | `/api/graph/:entry/gods`          | List most connected nodes |
 | `GET`    | `/api/entries/:id/search?q=term`  | Search built docs |
 | `GET`    | `/api/bundle/:entryId/*`          | Serve bundled HTML |
 
@@ -381,3 +468,4 @@ dockit/
 | Build Pipeline | Antora CLI, Git, Maven dependency plugin |
 | Markdown | marked |
 | Vector Search | LanceDB embedded (Rust native), all-MiniLM-L6-v2 via @huggingface/transformers |
+| Knowledge Graph | Graphify (Tree-sitter AST, 15+ languages) |
