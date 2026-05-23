@@ -3,6 +3,9 @@
   "version": "0.1.4",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "url": "https://github.com/karthik20/dockit"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
