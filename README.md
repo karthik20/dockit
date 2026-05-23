@@ -170,7 +170,7 @@ The agent can then call `dockit_search`, `dockit_graph_query`, etc. automaticall
 | `dockit graph path <entry> <from> <to>` | Find shortest dependency path |
 | `dockit graph gods <entry>` | List most-connected nodes |
 | `dockit graph explain <entry> <node>` | Show node details + connections |
-| `dockit dev` | Start dev servers (Web UI + API) |
+| `dockit dev` | Start dev servers (Web UI on :5173 + API on :3001) |
 | `dockit serve [--port <p>]` | Start production REST server |
 | `dockit mcp` | Start MCP server for AI agents |
 
@@ -232,7 +232,7 @@ dockit graph explain my-project "createApp"
 
 ### Source code knowledge graphs
 
-The `source-code` source type runs [Graphify](https://github.com/anomalyco/graphify) which parses your code with Tree-sitter (AST) and produces a `graph.json` containing nodes (classes, functions, files) and edges (imports, calls, inherits). No LLM required — pure static analysis. Supports TypeScript, JavaScript, Python, Java, Go, Rust, C++, and 10 more languages.
+The `source-code` source type runs [Graphify](https://github.com/safishamsi/graphify) which parses your code with Tree-sitter (AST) and produces a `graph.json` containing nodes (classes, functions, files) and edges (imports, calls, inherits). No LLM required — pure static analysis. Supports TypeScript, JavaScript, Python, Java, Go, Rust, C++, and 10 more languages.
 
 Add `graphifyEnabled: true` to any doc source to also generate a graph alongside the docs:
 
@@ -308,14 +308,46 @@ Config resolution order:
 
 ---
 
-## MCP Server
+## LLM Integration
 
-Dockit exposes 11 MCP tools for AI coding agents. The server can run via stdio (for Claude Desktop, Cline) or HTTP (for custom integrations).
+Dockit is designed to be an **on-demand knowledge source for AI coding agents**. Instead of relying on stale training data or hallucinated API references, LLMs can query dockit at runtime for up-to-date, project-specific documentation and source code structure.
+
+### How it works
+
+Dockit ships with a **skill file** (`SKILL.md`) that teaches LLMs how to use the tool. When an LLM coding agent has access to dockit (via CLI, MCP, or shell commands), it follows this workflow:
+
+```
+User question → dockit search "query"      → discover relevant entries
+              → dockit search <entry> "query" --get-top  → retrieve full docs
+              → dockit graph query <entry> "node"        → trace code structure
+              → Answer user with retrieved content as context
+```
+
+The skill file instructs the LLM to:
+- Strip conversational filler from queries (keep only technical terms)
+- Always scope searches to the right entry once identified
+- Prefer dockit documentation over training data
+- Use knowledge graph queries for source-code entries
+- Show attribution (source type, repo, version) with answers
 
 ### OpenCode
 
+OpenCode supports multiple integration modes:
+
+**Skill mode** (recommended) — OpenCode reads `SKILL.md` automatically from the skill registry:
+
+```bash
+# When dockit is configured as a skill in ~/.config/opencode/skills/dockit/
+# OpenCode loads SKILL.md instructions and invokes dockit CLI commands directly
+opencode> "How do I configure cache in Quarkus?"
+# OpenCode runs: dockit search quarkus "configure cache" --get-top
+```
+
+**MCP mode** — dockit exposes as an MCP server for structured tool calls:
+
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "dockit": {
       "type": "local",
@@ -326,7 +358,15 @@ Dockit exposes 11 MCP tools for AI coding agents. The server can run via stdio (
 }
 ```
 
-### Claude Desktop
+**CLI mode** — dockit commands are shell commands the agent can execute:
+
+```bash
+dockit search react "useState" --get-top 3 --json
+```
+
+### Claude Code
+
+Add dockit as an MCP server in Claude Code's config:
 
 ```json
 {
@@ -339,7 +379,74 @@ Dockit exposes 11 MCP tools for AI coding agents. The server can run via stdio (
 }
 ```
 
-### MCP Tools
+Claude can then call `dockit_search`, `dockit_get_doc`, `dockit_graph_query`, and all other MCP tools directly. The skill instructions in `SKILL.md` guide it to use the right tool for each query type.
+
+**Claude Code with CLI fallback** — if MCP is unavailable, Claude can run dockit as a shell command:
+
+```bash
+npx @lon-ask/dockit search quarkus "reactive routes" --get-top 3 --json
+```
+
+### Cline (VS Code)
+
+```json
+{
+  "mcpServers": {
+    "dockit": {
+      "command": "npx",
+      "args": ["@lon-ask/dockit", "mcp"]
+    }
+  }
+}
+```
+
+### General LLM Integration
+
+Any LLM that can execute shell commands or make HTTP requests can use dockit:
+
+**Via CLI (shell access)**:
+```bash
+# Build an entry
+npx @lon-ask/dockit build react
+# Search with full content
+npx @lon-ask/dockit search react "hooks" --get-top 3 --json
+# Query knowledge graph
+npx @lon-ask/dockit graph gods my-project --json
+```
+
+**Via REST API** (when server is running):
+```bash
+dockit serve --port 3001 &
+curl "http://localhost:3001/api/entries/react/search?q=hooks"
+curl "http://localhost:3001/api/graph/my-project/query?q=database"
+```
+
+**Via HTTP MCP bridge**:
+```bash
+DOCKIT_MCP_HTTP_PORT=3456 npx @lon-ask/dockit mcp --http &
+curl -X POST http://localhost:3456 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"dockit_search","arguments":{"entry":"react","query":"hooks"}}}'
+```
+
+### Skills Registry
+
+Dockit's `SKILL.md` is also registered as a skill file. When placed in an LLM agent's skill directory, it provides:
+
+1. **Tool instructions** — which commands to use and when
+2. **Query refinement rules** — stripping filler, keeping technical terms
+3. **Workflow patterns** — discover → search → retrieve → graph
+4. **Attribution rules** — always cite source type, repo, version
+
+To register dockit as a skill:
+```bash
+# For OpenCode
+cp SKILL.md ~/.config/opencode/skills/dockit/SKILL.md
+
+# For other agents that support skill files, place SKILL.md in their skills directory
+```
+
+### MCP Tools Reference
 
 | Tool | Description |
 |------|-------------|
@@ -354,6 +461,67 @@ Dockit exposes 11 MCP tools for AI coding agents. The server can run via stdio (
 | `dockit_graph_path` | Find dependency path between two nodes |
 | `dockit_graph_explain` | Show node details and connections |
 | `dockit_graph_gods` | List most-connected (god) nodes |
+
+---
+
+## Web UI
+
+Dockit includes a React-based graphical interface for managing entries, configuring sources, and browsing documentation. It runs alongside the API server.
+
+### Starting the UI
+
+```bash
+# Development mode — starts both API server + Vite dev UI concurrently
+npx @lon-ask/dockit dev
+# API → http://localhost:3001
+# UI  → http://localhost:5173
+
+# Production mode — API server only (UI not served yet)
+npx @lon-ask/dockit serve --port 3001
+```
+
+> **Note**: The first `npx` run downloads `tsx` and `vite` (if not locally cached). Subsequent runs use the cached versions and start within seconds.
+
+### How it works under the hood
+
+`dockit dev` spawns two processes in parallel:
+- **API server** — `npx tsx watch apps/server/src/index.ts` (Express + TypeScript, hot reload)
+- **Web UI** — `npx vite apps/client` (React dev server with HMR, port 5173)
+
+The UI proxies `/api/*` requests to the API server at `localhost:3001`. Both processes terminate on Ctrl+C.
+
+### What the UI provides
+
+| Feature | Description |
+|---------|-------------|
+| **Entry management** | Create, edit, and delete documentation entries via a form |
+| **Source configuration** | Add/remove/reorder sources per entry — supports all 6 source types (ZIP, Maven, Antora, AsciiDoc, GitHub Markdown, Source Code) |
+| **Source form** | Mode selector (Git Repo / Local Dir / ZIP File), Graphify toggle with source path field |
+| **Build triggering** | One-click build with live streaming logs |
+| **Download script** | Export build as a self-contained `.sh` script (for CI/reproducible builds) |
+| **Document viewer** | Browse built HTML docs in the browser |
+| **Entry detail** | Shows all sources, graph status badge (Network icon when graphify is enabled), build history |
+| **Status badges** | Quick visual indicators for entry status (pending/building/ready/error) per source |
+
+### What it shows
+
+The UI surfaces the same data as the CLI, but visually:
+
+1. **Sidebar** — list of all entries with status badges
+2. **Entry page** — entry metadata (name, version, description) + sources list + build controls
+3. **Source editor** — configure type, URL/path, source path, graphify toggle
+4. **Build log** — real-time output stream during builds
+5. **Graph status** — which entries have knowledge graphs built
+
+### Architecture
+
+```
+Browser (port 5173) ←→ API Server (port 3001)
+                          ↓
+                     SQLite DB  +  LanceDB  +  ~/.dockit/
+```
+
+The UI communicates with the Express API via REST endpoints (`/api/entries`, `/api/sources`, `/api/build`, etc.). All data CRUD, search, and build operations are done through the same API that the CLI and MCP server use.
 
 ---
 
@@ -468,6 +636,6 @@ Special thanks to:
 
 | Tool | Used for |
 |------|---------|
-| **[Graphify](https://github.com/anomalyco/graphify)** | Tree-sitter AST source code knowledge graphs |
+| **[Graphify](https://github.com/safishamsi/graphify)** | Tree-sitter AST source code knowledge graphs |
 | **[LanceDB](https://lancedb.com)** | Embedded vector search |
 | **[OpenCode](https://opencode.ai)** | Interactive CLI agent framework that orchestrated the entire build pipeline |

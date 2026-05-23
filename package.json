@@ -1,6 +1,6 @@
 {
   "name": "@lon-ask/dockit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local documentation hub — normalize multiple doc sources into a unified searchable bundle",
   "type": "module",
   "bin": {
@@ -9,7 +9,13 @@
   "files": [
     "bin/",
     "apps/server/src/",
+    "apps/server/dist/",
+    "apps/server/package.json",
+    "apps/client/src/",
     "apps/client/dist/",
+    "apps/client/package.json",
+    "apps/client/vite.config.ts",
+    "apps/client/index.html",
     "dockit.yaml",
     "SKILL.md",
     "scripts/mcp-wrapper.sh"
@@ -45,11 +51,19 @@
     "node-html-parser": "^6.1.13",
     "marked": "^18.0.3",
     "unzipper": "^0.12.3",
-    "uuid": "^11.0.5"
+    "uuid": "^11.0.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1",
+    "lucide-react": "^0.469.0",
+    "vite": "^6.0.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0"
   },
   "optionalDependencies": {
     "@lancedb/lancedb": "^0.27.2",
-    "@lon-ask/dockit-embeddings": "^0.1.1"
+    "@lon-ask/dockit-embeddings": "^0.1.2"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
