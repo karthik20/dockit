@@ -103,6 +103,31 @@ If Dockit is configured as an MCP server, use `dockit_*` tools instead of CLI co
 | `dockit_search` | `dockit search <entry> "query"` |
 | `dockit_get_doc` | `dockit get <entry> <path>` |
 | `dockit_build` / `dockit_build_status` | `dockit build` / `dockit status` |
+| `dockit_graph_query` | (MCP only) |
+| `dockit_graph_path` | (MCP only) |
+| `dockit_graph_explain` | (MCP only) |
+| `dockit_graph_gods` | (MCP only) |
+
+## Source Code Entries (Knowledge Graph)
+
+For entries with `source-code` sources, the primary query mechanism is the **knowledge graph** instead of text search. Graphify's Tree-sitter AST pass parses 15+ languages and produces structural edges (*calls*, *imports*, *inherits*).
+
+### Graph MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `dockit_graph_query <entry> <query>` | Search graph nodes by name, file, or type |
+| `dockit_graph_path <entry> <from> <to>` | Find shortest dependency path between two nodes |
+| `dockit_graph_explain <entry> <node>` | Get node details with edges and connections |
+| `dockit_graph_gods <entry>` | List most connected (highest-degree) nodes |
+
+### Behavior by Entry Type
+
+| Entry Type | Search | Graph Query |
+|------------|--------|-------------|
+| Source-code only | `dockit search` returns empty | Use `dockit_graph_*` tools |
+| Mixed (docs + code) | `dockit search` works + results graph-boosted | `dockit_graph_*` tools work |
+| Docs only | `dockit search` works | No graph tools |
 
 ## Notes
 - Documentation is plain text extracted from HTML
@@ -122,7 +147,7 @@ After answering with documentation content, always display the source in a table
 | **Version** | `<entry version>` |
 
 To get source details, use `--json` flag with search or check `dockit list --json`. Source fields come from the entry's `sources` array in `dockit.yaml`:
-- `type` — source type (e.g., `github-markdown`, `asciidoc`, `maven`)
+- `type` — source type (e.g., `github-markdown`, `asciidoc`, `maven`, `source-code`)
 - `label` — human-readable label
 - `repoUrl` or `localPath` — repository URL or local path
 - `sourcePath` — path within the repo

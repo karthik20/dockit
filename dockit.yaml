@@ -109,6 +109,42 @@ entries:
   #       localPath: "/home/user/repos/react.dev"
   #       sourcePath: "src/content"
 
+  # --- Source code entries (powered by Graphify) ---
+
+  - id: quarkus-code
+    name: Quarkus Source Code
+    version: "3.35"
+    description: "Quarkus framework source code — knowledge graph"
+    sources:
+      - type: source-code
+        label: "Quarkus Core"
+        repoUrl: "https://github.com/quarkusio/quarkus.git"
+        sourcePath: "core/src/main/java"
+
+  - id: quarkus-combined
+    name: Quarkus (Docs + Code)
+    version: "3.35"
+    description: "Quarkus with searchable docs and code knowledge graph"
+    sources:
+      - type: asciidoc
+        label: "Quarkus Docs"
+        repoUrl: "https://github.com/quarkusio/quarkus.git"
+        sourcePath: "docs/src/main/asciidoc"
+      - type: source-code
+        label: "Quarkus Core"
+        repoUrl: "https://github.com/quarkusio/quarkus.git"
+        sourcePath: "core/src/main/java"
+
+  - id: dockit-code
+    name: Dockit Source Code
+    version: "1.0"
+    description: "Dockit project source code — knowledge graph"
+    sources:
+      - type: source-code
+        label: "Dockit Code"
+        localPath: "/home/karthik/projects/ai/dockit"
+        sourcePath: "apps"
+
 search:
   engine: vector  # 'vector' (default, semantic search) | 'json' (fallback, low-resource)
 

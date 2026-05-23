@@ -43,6 +43,8 @@ export class BuildUseCase {
     try {
       const normalizedSources: Array<{ label: string; dir: string }> = [];
 
+      const scProcessor = this.processors.find((p) => p.sourceType === 'source-code');
+
       for (const source of sources) {
         const sourceDir = path.join(entryDir, 'sources', source.id);
         log(`Processing source [${source.type}]: ${source.label}`);
@@ -54,6 +56,13 @@ export class BuildUseCase {
           if (!processor) throw new BuildError(`No processor for source type: ${source.type}`, entryId);
           const outputDir = await processor.process(source, sourceDir, entryDir, entryId, log);
           normalizedSources.push({ label: source.label, dir: outputDir });
+
+          const sourceConfig = source.config as Record<string, unknown>;
+          if (sourceConfig.graphifyEnabled && scProcessor?.runGraphify) {
+            log(`  Graphify enabled — generating knowledge graph...`);
+            await scProcessor.runGraphify(sourceConfig, entryDir, log);
+          }
+
           await this.sourceRepo.updateStatus(source.id, 'ready');
         } catch (err) {
           await this.sourceRepo.updateStatus(source.id, 'error');
@@ -64,7 +73,8 @@ export class BuildUseCase {
       }
 
       log('Normalizing documentation bundle');
-      const htmlFiles = this.documentNormalizer.normalize(normalizedSources, bundleDir, log);
+      const htmlSources = this.documentNormalizer.filterSources(normalizedSources, sources);
+      const htmlFiles = this.documentNormalizer.normalize(htmlSources, bundleDir, log);
 
       log('Building search index');
       await this.searchEngine.buildIndex(

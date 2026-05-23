@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import type { ConfigUseCase } from '../core/usecases/ConfigUseCase.js';
 import type { SourceType } from '../core/domain/types.js';
 
-const VALID_TYPES: SourceType[] = ['zip', 'antora', 'maven', 'asciidoc', 'github-markdown'];
+const VALID_TYPES: SourceType[] = ['zip', 'antora', 'maven', 'asciidoc', 'github-markdown', 'source-code'];
 
 function validateConfig(type: SourceType, config: Record<string, unknown>): string | null {
   switch (type) {
@@ -37,6 +37,15 @@ function validateConfig(type: SourceType, config: Record<string, unknown>): stri
       if (!hasRepoUrl && !hasLocalPath) return 'repoUrl or localPath is required';
       return null;
     }
+    case 'source-code': {
+      const hasRepoUrl = config.repoUrl && typeof config.repoUrl === 'string';
+      const hasLocalPath = config.localPath && typeof config.localPath === 'string';
+      const hasZipPath = config.zipPath && typeof config.zipPath === 'string';
+      if (!hasRepoUrl && !hasLocalPath && !hasZipPath) return 'repoUrl, localPath, or zipPath is required';
+      return null;
+    }
+    default:
+      return null;
   }
 }
 

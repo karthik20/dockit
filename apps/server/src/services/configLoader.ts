@@ -20,6 +20,8 @@ export interface DockitSourceConfig {
   localPath?: string;
   localJar?: string;
   useMavenCommand?: boolean;
+  graphifyEnabled?: boolean;
+  graphifySourcePath?: string;
 }
 
 export interface DockitEntryConfig {
@@ -100,6 +102,11 @@ function validateSourceConfig(source: DockitSourceConfig): void {
         throw new Error(`GitHub Markdown source "${source.label}" requires repoUrl or localPath`);
       }
       break;
+    case 'source-code':
+      if (!source.repoUrl && !source.localPath && !source.zipPath) {
+        throw new Error(`Source code source "${source.label}" requires repoUrl, localPath, or zipPath`);
+      }
+      break;
     default:
       throw new Error(`Unknown source type: "${source.type}" in source "${source.label}"`);
   }
@@ -167,6 +174,8 @@ function buildSourceConfig(source: DockitSourceConfig): SourceConfig {
         zipPath: source.zipPath,
         localPath: source.localPath,
         playbookOverrides: source.playbookOverrides,
+        graphifyEnabled: source.graphifyEnabled,
+        graphifySourcePath: source.graphifySourcePath,
       };
     case 'asciidoc':
       return {
@@ -174,6 +183,8 @@ function buildSourceConfig(source: DockitSourceConfig): SourceConfig {
         zipPath: source.zipPath,
         localPath: source.localPath,
         sourcePath: source.sourcePath,
+        graphifyEnabled: source.graphifyEnabled,
+        graphifySourcePath: source.graphifySourcePath,
       };
     case 'github-markdown':
       return {
@@ -181,6 +192,17 @@ function buildSourceConfig(source: DockitSourceConfig): SourceConfig {
         localPath: source.localPath,
         sourcePath: source.sourcePath,
         branch: source.branch,
+        graphifyEnabled: source.graphifyEnabled,
+        graphifySourcePath: source.graphifySourcePath,
+      };
+    case 'source-code':
+      return {
+        repoUrl: source.repoUrl,
+        localPath: source.localPath,
+        zipPath: source.zipPath,
+        sourcePath: source.sourcePath,
+        branch: source.branch,
+        graphifySourcePath: source.graphifySourcePath,
       };
   }
 }

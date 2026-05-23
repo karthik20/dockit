@@ -8,6 +8,7 @@ import type { AntoraSourceConfig } from '../core/domain/types.js';
 
 async function cloneRepo(repoUrl: string, targetDir: string, log: (msg: string) => void): Promise<void> {
   log(`Cloning repository ${repoUrl}`);
+  if (fs.existsSync(targetDir)) fs.rmSync(targetDir, { recursive: true, force: true });
   return new Promise((resolve, reject) => {
     const proc = spawn('git', ['clone', '--depth', '1', repoUrl, targetDir], {
       stdio: ['ignore', 'pipe', 'pipe'],
