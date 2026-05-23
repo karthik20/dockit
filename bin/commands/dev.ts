@@ -4,13 +4,13 @@ export default function dev(root, positional, flags) {
   console.log('Starting Dockit dev servers...');
   console.log('');
 
-  const server = spawn('npx', ['tsx', 'watch', 'apps/server/src/index.ts'], {
+  const server = spawn('npx tsx watch apps/server/src/index.ts', [], {
     cwd: root,
     stdio: 'inherit',
     shell: true,
   });
 
-  const client = spawn('npx', ['vite', 'apps/client'], {
+  const client = spawn('npx vite apps/client', [], {
     cwd: root,
     stdio: 'inherit',
     shell: true,

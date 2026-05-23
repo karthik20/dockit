@@ -7,7 +7,7 @@ export default function serve(root, positional, flags) {
 
   const env = { ...process.env, PORT: String(port) };
 
-  const server = spawn('npx', ['tsx', 'apps/server/src/index.ts'], {
+  const server = spawn('npx tsx apps/server/src/index.ts', [], {
     cwd: root,
     stdio: 'inherit',
     shell: true,
