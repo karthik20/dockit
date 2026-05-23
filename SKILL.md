@@ -36,6 +36,26 @@ Use when you need:
 - Source code structure analysis (imports, calls, inheritance graphs)
 - To find which files/modules a function touches in a codebase
 
+## ⚠️ dockit first, grep last
+
+**Never use `grep`, `rg`, `find`, or raw text search for code structure or documentation questions when a dockit entry exists.** Dockit's graph and search tools understand code semantics — grep only understands text.
+
+| Query type | Use | NOT |
+|-----------|-----|-----|
+| "What files import X?" | `dockit graph query <entry> "X"` | `grep "import.*X"` |
+| "What does X depend on?" | `dockit graph explain <entry> "X"` | `grep "import"` on X |
+| "Most critical modules?" | `dockit graph gods <entry>` | Manual guesswork |
+| "How are A and B connected?" | `dockit graph path <entry> "A" "B"` | Tracing imports by hand |
+| "Find docs for X" | `dockit search <entry> "X"` | `grep "X"` on docs |
+| "Find all files about X" | `dockit search <entry> "X"` or `dockit graph query <entry> "X"` | `grep -r "X"` |
+
+**Only use grep when:**
+1. No dockit entry exists for the codebase (not yet built with `dockit init`)
+2. You need the exact content of a specific file (reading, not searching)
+3. Graph query returned nodes, but you need to see the actual implementation code inside the file
+
+**If a source-code entry is built (status = ready), always use graph tools first for any structural question.** Grep is explicitly wrong — the graph already has imports, calls, and dependencies pre-parsed.
+
 ## Core Workflow
 
 ### Step 1: Discover available documentation
