@@ -48,7 +48,8 @@
     "uuid": "^11.0.5"
   },
   "optionalDependencies": {
-    "@lancedb/lancedb": "^0.27.2"
+    "@lancedb/lancedb": "^0.27.2",
+    "@lon-ask/dockit-embeddings": "^0.1.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
