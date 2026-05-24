@@ -88,7 +88,6 @@ fn main() {
 
     let repo_root = resolve_repo_root();
     let server_script = resolve_server_script(&repo_root);
-    let project_root = repo_root.to_string_lossy().to_string();
 
     let mut server = ServerProcess::new(port);
     match server.start(&server_script) {
@@ -111,7 +110,6 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .manage(ServerState {
             process: std::sync::Mutex::new(server),
-            project_root,
         })
         .invoke_handler(tauri::generate_handler![
             get_server_status,

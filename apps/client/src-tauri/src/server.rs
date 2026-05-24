@@ -117,5 +117,4 @@ impl Drop for ServerProcess {
 
 pub struct ServerState {
     pub process: Mutex<ServerProcess>,
-    pub project_root: String,
 }
