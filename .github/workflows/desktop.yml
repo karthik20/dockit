@@ -1,0 +1,96 @@
+name: Build Desktop App
+
+on:
+  push:
+    branches: [feat/tauri-desktop-app, main]
+    paths:
+      - 'apps/client/**'
+      - 'apps/server/**'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/client/**'
+      - 'apps/server/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+jobs:
+  build-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: ''
+          - platform: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            args: '--target aarch64-unknown-linux-gnu'
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            args: '--target x86_64-apple-darwin'
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: '--target aarch64-apple-darwin'
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: '--target x86_64-pc-windows-msvc'
+          - platform: windows-latest
+            target: aarch64-pc-windows-msvc
+            args: '--target aarch64-pc-windows-msvc'
+
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install linux dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: setup rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'apps/client/src-tauri -> target'
+
+      - name: install dependencies
+        run: npm ci
+
+      - name: build api server
+        run: npm run build:server
+
+      - name: build desktop app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./apps/client
+          tagName: desktop-v__VERSION__-${{ matrix.target }}
+          releaseName: 'Dockit Desktop v__VERSION__ (${{ matrix.target }})'
+          releaseBody: |
+            Dockit desktop app for **${{ matrix.target }}**
+
+            | Platform | Architecture |
+            |----------|-------------|
+            | ${{ matrix.platform }} | ${{ matrix.target }} |
+
+            See assets below to download.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

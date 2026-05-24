@@ -57,7 +57,11 @@ npx @lon-ask/dockit search my-project "authentication"
 
 `npx` downloads the package to a temp cache and executes it. Perfect for one-off usage or CI pipelines. Set `DOCKIT_DATA_DIR` to persist data across invocations.
 
-### Method 3: Build from source
+### Method 3: Desktop app (native)
+
+Download the native desktop app from [GitHub Releases](https://github.com/karthik20/dockit/releases). Available for Windows (x64/ARM64), macOS (Intel/Apple Silicon), and Linux (x64/ARM64). The app bundles everything — no Node.js required.
+
+### Method 4: Build from source
 
 ```bash
 git clone https://github.com/karthik20/dockit.git
@@ -670,6 +674,72 @@ The UI communicates with the Express API via REST endpoints (`/api/entries`, `/a
 
 ---
 
+## Tauri Desktop App
+
+Dockit ships a native desktop application built with **Tauri v2** for Windows, macOS, and Linux.
+
+### Why native
+
+The web UI requires starting two processes (`dockit dev`) and opening a browser. The Tauri app wraps the same React frontend in a native WebView, auto-starts the API server, and provides a single-window desktop experience with native window controls, menus, and system integration.
+
+### Supported platforms
+
+| OS | x86_64 | ARM64 |
+|----|--------|-------|
+| **Windows** | ✓ | ✓ |
+| **macOS** | ✓ | ✓ (Apple Silicon) |
+| **Linux** | ✓ | ✓ |
+
+### Development
+
+```bash
+# Install Rust toolchain first (https://rustup.rs)
+# Then from the repo root:
+npm install
+npm run build:server          # compile the Express API server
+npm run desktop:dev           # starts Vite dev + Tauri native window
+```
+
+### Building distributables
+
+```bash
+npm run desktop:build         # production build for current platform
+```
+
+Build artifacts are output to `apps/client/src-tauri/target/release/bundle/`.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│ Tauri App (Rust)                             │
+│  ┌─────────────────────────────────────┐    │
+│  │ WebView (React SPA)                 │    │
+│  │  - HashRouter                       │    │
+│  │  - Calls Express at localhost:3001  │    │
+│  └─────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────┐    │
+│  │ Rust Backend                        │    │
+│  │  - Spawns Express server on launch  │    │
+│  │  - Manages lifecycle (start/stop)   │    │
+│  │  - IPC commands for UI              │    │
+│  └─────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────┐    │
+│  │ Express Server (child process)       │    │
+│  │  - Port 3001 (configurable)         │    │
+│  │  - Full API stack as-is             │    │
+│  └─────────────────────────────────────┘    │
+└─────────────────────────────────────────────┘
+```
+
+The Tauri app's Rust backend spawns the Express API server as a managed child process on startup. When the window closes, the server is cleanly shut down. The frontend communicates with the API over `http://localhost:3001` — the same API used by the CLI and web UI.
+
+### CI builds
+
+GitHub Actions build native binaries for all 6 platform targets on every push to the branch. See `.github/workflows/desktop.yml`.
+
+---
+
 ## Offline / Air-Gapped Mode
 
 Dockit is designed for full offline operation:
@@ -702,6 +772,7 @@ dockit/                          # npm package @lon-ask/dockit
 │   │       ├── routes/          # REST API, graph endpoints, viewer
 │   │       └── services/        # Config loader, text extractor, normalizer
 │   └── client/                  # React + Vite web UI (port 5173)
+│       └── src-tauri/           # Tauri v2 native desktop app (Rust backend)
 ├── packages/
 │   └── embeddings/              # @lon-ask/dockit-embeddings
 │       └── model/               # all-MiniLM-L6-v2 ONNX (88 MB)

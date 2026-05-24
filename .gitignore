@@ -9,3 +9,8 @@ packages/embeddings/model/
 graphify-out/
 .opencode/node_modules/
 .opencode/PLAN.md
+apps/client/src-tauri/target/
+apps/client/src-tauri/gen/
+*.dylib
+*.so
+*.dll
