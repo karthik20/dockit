@@ -1,9 +1,12 @@
 import type { Entry, EntryDetail, Source, SourceConfig, BuildStatusResponse, SearchResult } from '../types';
+import { getApiBase } from './tauri-client';
 
-const BASE = '/api';
+function base() {
+  return getApiBase();
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${url}`, {
+  const res = await fetch(`${base()}${url}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
@@ -41,7 +44,7 @@ export const api = {
     status: (entryId: string) =>
       request<BuildStatusResponse>(`/entries/${entryId}/build-status`),
     cliScript: (entryId: string) =>
-      fetch(`${BASE}/entries/${entryId}/cli-script`).then((r) => r.text()),
+      fetch(`${base()}/entries/${entryId}/cli-script`).then((r) => r.text()),
   },
 
   search: (entryId: string, q: string) =>
@@ -50,5 +53,5 @@ export const api = {
   searchGlobal: (q: string) =>
     request<Array<SearchResult & { entryId: string; entryName: string; entryVersion: string }>>(`/search?q=${encodeURIComponent(q)}`),
 
-  bundleUrl: (entryId: string) => `${BASE}/bundle/${entryId}/`,
+  bundleUrl: (entryId: string) => `${base()}/bundle/${entryId}/`,
 };
