@@ -35,7 +35,7 @@ fn get_server_status(state: State<ServerState>) -> ServerStatus {
 fn get_app_info() -> AppInfo {
     AppInfo {
         name: "Dockit".into(),
-        version: "0.1.5".into(),
+        version: "0.1.7".into(),
         platform: std::env::consts::OS.into(),
         arch: std::env::consts::ARCH.into(),
     }

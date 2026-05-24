@@ -1,6 +1,6 @@
 [package]
 name = "dockit"
-version = "0.1.5"
+version = "0.1.7"
 description = "Local documentation hub — native desktop app"
 authors = ["dockit"]
 edition = "2021"
