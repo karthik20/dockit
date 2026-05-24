@@ -2,13 +2,7 @@ name: Build Desktop App
 
 on:
   push:
-    branches: [feat/tauri-desktop-app, main]
-    paths:
-      - 'apps/client/**'
-      - 'apps/server/**'
-      - '.github/workflows/desktop.yml'
-  pull_request:
-    branches: [main]
+    branches: ['release/v*']
     paths:
       - 'apps/client/**'
       - 'apps/server/**'
