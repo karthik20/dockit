@@ -37,6 +37,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../../server/dist/**": "server/"
+    },
     "windows": {
       "wix": {
         "language": "en-US"

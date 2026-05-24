@@ -41,43 +41,42 @@ fn get_app_info() -> AppInfo {
     }
 }
 
-fn resolve_repo_root() -> PathBuf {
-    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let dev_root = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .and_then(|p| p.parent());
-
-    let dev_script = dev_root
-        .as_ref()
-        .map(|r| r.join("apps/server/dist/index.js"));
-
-    if let Some(ref script) = dev_script {
-        if script.exists() {
-            return dev_root.unwrap().to_path_buf();
-        }
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(exe_dir) = exe.parent() {
-            let script = exe_dir.join("apps/server/dist/index.js");
-            if script.exists() {
-                return exe_dir.to_path_buf();
-            }
-        }
-    }
-
-    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-}
-
-fn resolve_server_script(repo_root: &std::path::Path) -> PathBuf {
+fn resolve_server_script() -> PathBuf {
+    // Env override takes precedence
     if let Ok(p) = std::env::var("DOCKIT_SERVER_PATH") {
         let path = PathBuf::from(&p);
         if path.exists() {
             return path;
         }
     }
-    repo_root.join("apps/server/dist/index.js")
+
+    // Production: bundled via Tauri resources (exe_dir/server/index.js)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let bundled = exe_dir.join("server/index.js");
+            if bundled.exists() {
+                return bundled;
+            }
+        }
+    }
+
+    // Development: source tree (CARGO_MANIFEST_DIR = src-tauri/)
+    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dev_script = crate_dir
+        .parent()     // src-tauri → client
+        .and_then(|p| p.parent())   // client → apps
+        .and_then(|p| p.parent())   // apps → repo root
+        .map(|r| r.join("apps/server/dist/index.js"));
+
+    if let Some(ref script) = dev_script {
+        if script.exists() {
+            return script.clone();
+        }
+    }
+
+    // Last resort: CWD-relative
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    cwd.join("apps/server/dist/index.js")
 }
 
 fn main() {
@@ -86,8 +85,7 @@ fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3001);
 
-    let repo_root = resolve_repo_root();
-    let server_script = resolve_server_script(&repo_root);
+    let server_script = resolve_server_script();
 
     let mut server = ServerProcess::new(port);
     match server.start(&server_script) {
