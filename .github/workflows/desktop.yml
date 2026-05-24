@@ -2,11 +2,7 @@ name: Build Desktop App
 
 on:
   push:
-    branches: ['release/v*']
-    paths:
-      - 'apps/client/**'
-      - 'apps/server/**'
-      - '.github/workflows/desktop.yml'
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:

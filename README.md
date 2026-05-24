@@ -1,5 +1,8 @@
 # Dockit
 
+[![Publish to npm](https://github.com/karthik20/dockit/actions/workflows/publish.yml/badge.svg?event=release)](https://github.com/karthik20/dockit/actions/workflows/publish.yml)
+[![Build Desktop App](https://github.com/karthik20/dockit/actions/workflows/desktop.yml/badge.svg)](https://github.com/karthik20/dockit/actions/workflows/desktop.yml)
+
 > Built with [OpenCode](https://opencode.ai) and [DeepSeek](https://deepseek.com)
 
 > **Local documentation hub** — aggregate, index, and search your project's documentation and source code.
