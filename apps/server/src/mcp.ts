@@ -1,4 +1,5 @@
-import { McpServer, StdioServerTransport, fromJsonSchema } from '@modelcontextprotocol/server';
+import { McpServer, fromJsonSchema } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import path from 'node:path';
 import fs from 'node:fs';
 import { loadConfig, syncConfigToDb } from './services/configLoader.js';
