@@ -11,6 +11,7 @@ graphify-out/
 .opencode/PLAN.md
 apps/client/src-tauri/target/
 apps/client/src-tauri/gen/
+*.tsbuildinfo
 *.dylib
 *.so
 *.dll
